@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KP Tracker | Police Portal v2.0</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary-bg: #0a0e14;
+            --accent-blue: #00d2ff;
+            --danger-red: #ff4b2b;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--primary-bg);
+            color: white;
+            overflow: hidden;
+        }
+
+        /* Header Section */
+        header {
+            padding: 15px 25px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 2px solid var(--accent-blue);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            background: var(--danger-red);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* Main Layout */
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: calc(100vh - 70px);
+        }
+
+        /* Sidebar Control Panel */
+        .sidebar {
+            background: var(--glass-bg);
+            padding: 20px;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            overflow-y: auto;
+        }
+
+        .control-card {
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .btn-capture { background: var(--danger-red); color: white; }
+        .btn-track { background: var(--accent-blue); color: black; }
+
+        /* Map Section */
+        #map {
+            width: 100%;
+            height: 100%;
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo"><strong>KP TRACKER</strong> <span style="color: var(--accent-blue);">PRO</span></div>
+    <div class="status-badge">LIVE TRACKING ACTIVE</div>
+</header>
+
+<div class="container">
+    <div class="sidebar">
+        <div class="control-card">
+            <h3>Target Details</h3>
+            <div class="stats-grid">
+                <div>Lat: <span id="lat" style="color: var(--accent-blue);">25.xxx</span></div>
+                <div>Lng: <span id="lng" style="color: var(--accent-blue);">82.xxx</span></div>
+                <div>Speed: <span id="speed">0 km/h</span></div>
+                <div>Device: <span id="battery">92%</span></div>
+            </div>
+        </div>
+
+        <div class="control-card">
+            <h3>Surveillance Tools</h3>
+            <button class="btn btn-capture">Capture Silent Photo</button>
+            <button class="btn btn-track" onclick="startTracking()">Force Update Location</button>
+        </div>
+
+        <div class="control-card" style="border-left-color: #f1c40f;">
+            <h3>System Logs</h3>
+            <p style="font-size: 0.8rem; color: #888;">[11:05] Server Connected...<br>[11:06] GPS Signal Found...</p>
+        </div>
+    </div>
+
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Initialize Map
+    var map = L.map('map').setView([25.6881, 82.4172], 13); // Default Machhali Shahar coordinates
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var marker = L.marker([25.6881, 82.4172]).addTo(map)
+        .bindPopup('Target Location')
+        .openPopup();
+
+    function startTracking() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                
+                document.getElementById('lat').innerText = lat.toFixed(4);
+                document.getElementById('lng').innerText = lng.toFixed(4);
+                
+                map.setView([lat, lng], 15);
+                marker.setLatLng([lat, lng]);
+            });
+        } else {
+            alert("GPS not supported by this browser.");
+        }
+    }
+</script>
+
+</body>
+</html>
