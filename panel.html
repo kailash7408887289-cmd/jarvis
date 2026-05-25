@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JARVIS V17.33 - TACTICAL POLICE PANEL</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Side Panel (The Command Center) */
+        #side-panel { width: 360px; background: #0a0a0a; border-right: 3px solid #ff0000; padding: 20px; z-index: 1000; overflow-y: auto; box-shadow: 10px 0 20px rgba(255,0,0,0.2); }
+        #map-container { flex-grow: 1; position: relative; background: #000; }
+        #map { width: 100%; height: 100%; }
+
+        /* Tactical Header */
+        .header { text-align: center; border-bottom: 2px solid #ff0000; margin-bottom: 20px; padding-bottom: 10px; }
+        .header h2 { margin: 0; color: #ff0000; letter-spacing: 3px; font-size: 22px; }
+        .header small { color: #39ff14; font-weight: bold; }
+
+        /* Photo Box with Scanner */
+        .photo-box { width: 100%; height: 240px; border: 2px solid #ff0000; position: relative; background: #000; overflow: hidden; margin-bottom: 15px; }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+        .scanner { width: 100%; height: 3px; background: #ff0000; position: absolute; top: 0; animation: scan 2s linear infinite; box-shadow: 0 0 15px #ff0000; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+
+        /* Audio Control Panel */
+        .audio-card { background: rgba(57, 255, 20, 0.05); border: 1px solid #39ff14; padding: 12px; border-radius: 5px; margin-bottom: 15px; }
+        .audio-card label { color: #39ff14; font-size: 10px; font-weight: bold; display: block; margin-bottom: 5px; }
+        #audio-status { font-size: 9px; color: #888; margin-bottom: 5px; }
+        audio { width: 100%; height: 35px; filter: invert(1); }
+
+        /* Data Display */
+        .info-card { background: rgba(255, 255, 255, 0.03); border-left: 4px solid #ff0000; padding: 10px; margin-bottom: 10px; }
+        .label { font-size: 10px; color: #888; text-transform: uppercase; }
+        .value { font-size: 13px; color: #fff; font-weight: bold; display: block; margin-top: 3px; }
+
+        /* Right Side Map Tools */
+        .map-tools { position: absolute; right: 15px; top: 15px; z-index: 1001; display: flex; flex-direction: column; gap: 10px; }
+        .tool-btn { width: 45px; height: 45px; background: #111; border: 1px solid #ff0000; color: #ff0000; border-radius: 5px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(255,0,0,0.5); }
+        .tool-btn:hover { background: #ff0000; color: #fff; }
+
+        /* Action Buttons */
+        .action-btn { width: 100%; padding: 15px; margin-top: 10px; font-weight: bold; cursor: pointer; border: none; text-transform: uppercase; border-radius: 4px; }
+        .nav-btn { background: #39ff14; color: #000; }
+        .pdf-btn { background: #ff0000; color: #fff; }
+
+        /* Precise Marker */
+        .marker-box { position: relative; }
+        .arrow-tip { width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 30px solid #ff0000; filter: drop-shadow(0 0 10px #ff0000); }
+        .ping-ring { width: 50px; height: 50px; border: 2px solid #ff0000; border-radius: 50%; position: absolute; top: -10px; left: -10px; animation: ping 1.2s infinite; }
+        @keyframes ping { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
+    </style>
+</head>
+<body onclick="enableAudio()"> <div id="side-panel">
+        <div class="header">
+            <h2>TARGET LOCKED</h2>
+            <small id="sys-status">CONNECTION: SECURE</small>
+        </div>
+
+        <div class="photo-box">
+            <div class="scanner"></div>
+            <img id="d-photo" src="https://via.placeholder.com/300x200?text=SCANNING+INTEL">
+        </div>
+
+        <div class="audio-card">
+            <label>LIVE AUDIO INTERCEPT (60S)</label>
+            <div id="audio-status">Waiting for signal...</div>
+            <audio id="v-audio" controls autoplay><source id="audio-src" src=""></audio>
+        </div>
+
+        <div class="info-card">
+            <span class="label">Criminal Location</span>
+            <span id="d-addr" class="value" style="color:#ff4d4d;">Locating Area...</span>
+        </div>
+
+        <div class="info-card">
+            <span class="label">Tactical Coordinates</span>
+            <span id="d-coords" class="value">0.0000000, 0.0000000</span>
+        </div>
+
+        <button class="action-btn nav-btn" onclick="openNav()">🚀 INTERCEPT (GOOGLE MAPS)</button>
+        <button class="action-btn pdf-btn" onclick="generateReport()">📥 DOWNLOAD EVIDENCE PDF</button>
+    </div>
+
+    <div id="map-container">
+        <div class="map-tools">
+            <button class="tool-btn" title="Tactical Pencil" onclick="toggleDrawing()">✏️</button>
+            <button class="tool-btn" title="Clear Marks" onclick="clearDrawnItems()">🧹</button>
+            <button class="tool-btn" title="Refresh Map" onclick="location.reload()">🛰️</button>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        // --- 1. FIREBASE SETUP ---
+        const firebaseConfig = { databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // --- 2. MAP INITIALIZATION (High-Res Satellite) ---
+        var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([25.74, 82.26], 19);
+        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
+        }).addTo(map);
+
+        // --- 3. DRAWING TOOLS ---
+        var drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+        var drawControl = new L.Control.Draw({
+            draw: { polygon: true, polyline: true, circle: true, rectangle: true, marker: false, circlemarker: false },
+            edit: { featureGroup: drawnItems }
+        });
+        
+        let isDrawing = false;
+        function toggleDrawing() {
+            isDrawing = !isDrawing;
+            isDrawing ? map.addControl(drawControl) : map.removeControl(drawControl);
+        }
+        function clearDrawnItems() { drawnItems.clearLayers(); }
+        map.on(L.Draw.Event.CREATED, (e) => drawnItems.addLayer(e.layer));
+
+        // --- 4. REAL-TIME CORE ---
+        var currentMarker, tLat, tLon;
+        let audioEnabled = false;
+
+        function enableAudio() { audioEnabled = true; }
+
+        database.ref('live_detect').on('value', (s) => {
+            const d = s.val(); if(!d) return;
+
+            // Photo & Visuals
+            if(d.photo) document.getElementById('d-photo').src = d.photo;
+
+            // Audio Auto-Start Logic
+            if(d.audio_url) {
+                const player = document.getElementById('v-audio');
+                const src = document.getElementById('audio-src');
+                const status = document.getElementById('audio-status');
+                
+                if(src.src !== d.audio_url) {
+                    src.src = d.audio_url;
+                    player.load();
+                    player.play().then(() => {
+                        status.innerText = "● LIVE AUDIO STREAMING";
+                        status.style.color = "#39ff14";
+                    }).catch(e => {
+                        status.innerText = "⚠ CLICK ANYWHERE TO START AUDIO";
+                        status.style.color = "#ffea00";
+                    });
+                }
+            }
+
+            // Precise Location Sync
+            if(d.location) {
+                tLat = d.location.lat;
+                tLon = d.location.lon;
+                document.getElementById('d-coords').innerText = tLat.toFixed(7) + ", " + tLon.toFixed(7);
+
+                if (currentMarker) map.removeLayer(currentMarker);
+
+                var tacticalIcon = L.divIcon({
+                    className: 'marker-box',
+                    html: `<div class="ping-ring"></div><div class="arrow-tip"></div>`,
+                    iconSize: [30, 42], iconAnchor: [15, 42]
+                });
+
+                currentMarker = L.marker([tLat, tLon], { icon: tacticalIcon }).addTo(map);
+                
+                // Zero-Latency Lock
+                map.setView([tLat, tLon], 19, { animate: false });
+
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${tLat}&lon=${tLon}`)
+                .then(r=>r.json()).then(res=> document.getElementById('d-addr').innerText = res.display_name );
+            }
+        });
+
+        function openNav() { if(tLat) window.open(`http://googleusercontent.com/maps.google.com/6{tLat},${tLon}`); }
+        function generateReport() { html2pdf().from(document.getElementById('side-panel')).save('Police_Evidence_Report.pdf'); }
+        
+        setTimeout(() => { map.invalidateSize(); }, 400);
+    </script>
+</body>
+</html>
