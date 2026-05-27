@@ -17,52 +17,38 @@
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Side Panel (The Command Center) */
         #side-panel { width: 360px; background: #0a0a0a; border-right: 3px solid #ff0000; padding: 20px; z-index: 1000; overflow-y: auto; box-shadow: 10px 0 20px rgba(255,0,0,0.2); }
         #map-container { flex-grow: 1; position: relative; background: #000; }
         #map { width: 100%; height: 100%; }
-
-        /* Tactical Header */
         .header { text-align: center; border-bottom: 2px solid #ff0000; margin-bottom: 20px; padding-bottom: 10px; }
         .header h2 { margin: 0; color: #ff0000; letter-spacing: 3px; font-size: 22px; }
         .header small { color: #39ff14; font-weight: bold; }
-
-        /* Photo Box with Scanner */
         .photo-box { width: 100%; height: 240px; border: 2px solid #ff0000; position: relative; background: #000; overflow: hidden; margin-bottom: 15px; }
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .scanner { width: 100%; height: 3px; background: #ff0000; position: absolute; top: 0; animation: scan 2s linear infinite; box-shadow: 0 0 15px #ff0000; }
         @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
-
-        /* Audio Control Panel */
         .audio-card { background: rgba(57, 255, 20, 0.05); border: 1px solid #39ff14; padding: 12px; border-radius: 5px; margin-bottom: 15px; }
         .audio-card label { color: #39ff14; font-size: 10px; font-weight: bold; display: block; margin-bottom: 5px; }
         #audio-status { font-size: 9px; color: #888; margin-bottom: 5px; }
         audio { width: 100%; height: 35px; filter: invert(1); }
-
-        /* Data Display */
         .info-card { background: rgba(255, 255, 255, 0.03); border-left: 4px solid #ff0000; padding: 10px; margin-bottom: 10px; }
         .label { font-size: 10px; color: #888; text-transform: uppercase; }
         .value { font-size: 13px; color: #fff; font-weight: bold; display: block; margin-top: 3px; }
-
-        /* Right Side Map Tools */
         .map-tools { position: absolute; right: 15px; top: 15px; z-index: 1001; display: flex; flex-direction: column; gap: 10px; }
         .tool-btn { width: 45px; height: 45px; background: #111; border: 1px solid #ff0000; color: #ff0000; border-radius: 5px; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(255,0,0,0.5); }
         .tool-btn:hover { background: #ff0000; color: #fff; }
-
-        /* Action Buttons */
         .action-btn { width: 100%; padding: 15px; margin-top: 10px; font-weight: bold; cursor: pointer; border: none; text-transform: uppercase; border-radius: 4px; }
         .nav-btn { background: #39ff14; color: #000; }
         .pdf-btn { background: #ff0000; color: #fff; }
-
-        /* Precise Marker */
         .marker-box { position: relative; }
         .arrow-tip { width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 30px solid #ff0000; filter: drop-shadow(0 0 10px #ff0000); }
         .ping-ring { width: 50px; height: 50px; border: 2px solid #ff0000; border-radius: 50%; position: absolute; top: -10px; left: -10px; animation: ping 1.2s infinite; }
         @keyframes ping { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
     </style>
 </head>
-<body onclick="enableAudio()"> <div id="side-panel">
+<body onclick="enableAudio()"> 
+
+    <div id="side-panel">
         <div class="header">
             <h2>TARGET LOCKED</h2>
             <small id="sys-status">CONNECTION: SECURE</small>
@@ -104,11 +90,23 @@
 
     <script>
         // --- 1. FIREBASE SETUP ---
-        const firebaseConfig = { databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/" };
-        firebase.initializeApp(firebaseConfig);
+        const firebaseConfig = {
+          apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
+          authDomain: "army-cb492.firebaseapp.com",
+          databaseURL: "https://army-cb492-default-rtdb.firebaseio.com",
+          projectId: "army-cb492",
+          storageBucket: "army-cb492.firebasestorage.app",
+          messagingSenderId: "449848409517",
+          appId: "1:449848409517:web:386ad1b570731b6ec4f524",
+          measurementId: "G-NVG20J32ZP"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const database = firebase.database();
 
-        // --- 2. MAP INITIALIZATION (High-Res Satellite) ---
+        // --- 2. MAP INITIALIZATION ---
         var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([25.74, 82.26], 19);
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
@@ -139,10 +137,8 @@
         database.ref('live_detect').on('value', (s) => {
             const d = s.val(); if(!d) return;
 
-            // Photo & Visuals
             if(d.photo) document.getElementById('d-photo').src = d.photo;
 
-            // Audio Auto-Start Logic
             if(d.audio_url) {
                 const player = document.getElementById('v-audio');
                 const src = document.getElementById('audio-src');
@@ -161,7 +157,6 @@
                 }
             }
 
-            // Precise Location Sync
             if(d.location) {
                 tLat = d.location.lat;
                 tLon = d.location.lon;
@@ -176,16 +171,22 @@
                 });
 
                 currentMarker = L.marker([tLat, tLon], { icon: tacticalIcon }).addTo(map);
-                
-                // Zero-Latency Lock
                 map.setView([tLat, tLon], 19, { animate: false });
 
                 fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${tLat}&lon=${tLon}`)
-                .then(r=>r.json()).then(res=> document.getElementById('d-addr').innerText = res.display_name );
+                .then(r=>r.json()).then(res=> document.getElementById('d-addr').innerText = res.display_name || "Unknown Location" );
             }
         });
 
-        function openNav() { if(tLat) window.open(`http://googleusercontent.com/maps.google.com/6{tLat},${tLon}`); }
+        // 🛠️ फिक्स किया गया गूगल मैप्स लिंक फंक्शन
+        function openNav() { 
+            if(tLat && tLon) { 
+                window.open(`https://www.google.com/maps?q=${tLat},${tLon}`, '_blank'); 
+            } else {
+                alert("लोकेशन डेटा लोड होने का इंतज़ार करें, बॉस!");
+            }
+        }
+        
         function generateReport() { html2pdf().from(document.getElementById('side-panel')).save('Police_Evidence_Report.pdf'); }
         
         setTimeout(() => { map.invalidateSize(); }, 400);
